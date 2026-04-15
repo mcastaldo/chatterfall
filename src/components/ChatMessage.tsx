@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import UserAvatar from "@/components/UserAvatar";
+import EmojiReactions from "@/components/EmojiReactions";
 import { formatCount } from "@/lib/utils";
 import type { PostWithMeta } from "@/types";
 
@@ -76,8 +77,8 @@ export default function ChatMessage({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        {/* Author + Timestamp */}
-        <div className="flex items-baseline gap-2">
+        {/* Author + Timestamp + Location + Distance */}
+        <div className="flex items-baseline gap-2 flex-wrap">
           {isAnonymous ? (
             <span className="text-gray-500 italic text-sm">Anonymous</span>
           ) : (
@@ -86,6 +87,11 @@ export default function ChatMessage({
             </span>
           )}
           <span className="text-xs text-gray-500">{timestamp}</span>
+          {post.locationName && (
+            <span className="text-[11px] text-gray-500">
+              📍 {post.locationName}
+            </span>
+          )}
           {post.distance != null && (
             <span className="text-[11px] text-gray-500">
               •{" "}
@@ -110,6 +116,26 @@ export default function ChatMessage({
             alt="Post attachment"
             className="mt-2 max-h-72 rounded-lg object-cover"
           />
+        )}
+
+        {/* Emoji reactions */}
+        {post.reactions && Object.keys(post.reactions).length > 0 && (
+          <EmojiReactions
+            postId={post.id}
+            reactions={post.reactions}
+            currentUserId={currentUserId}
+          />
+        )}
+
+        {/* Reaction add button (show even when no reactions yet, on hover) */}
+        {post.reactions && Object.keys(post.reactions).length === 0 && currentUserId && (
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+            <EmojiReactions
+              postId={post.id}
+              reactions={post.reactions}
+              currentUserId={currentUserId}
+            />
+          </div>
         )}
 
         {/* Reply indicator - always visible when there are comments */}
@@ -212,7 +238,6 @@ export default function ChatMessage({
               <span>{formatCount(post._count.comments)}</span>
             )}
           </button>
-
         </div>
       </div>
     </div>

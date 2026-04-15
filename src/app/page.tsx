@@ -5,12 +5,12 @@ import dynamic from "next/dynamic";
 import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { LocationGate, useLocation } from "@/components/LocationGate";
-import NavBar from "@/components/NavBar";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
 import NearbyUsers from "@/components/NearbyUsers";
 import ThreadPanel from "@/components/ThreadPanel";
 import FeedFilters from "@/components/FeedFilters";
+import NewMessagesPill from "@/components/NewMessagesPill";
 import type { PostWithMeta, FeedFilters as FeedFiltersType } from "@/types";
 
 const MapPanel = dynamic(() => import("@/components/MapPanel"), {
@@ -64,6 +64,7 @@ function FeedContent() {
   const [mapOpen, setMapOpen] = useState(false);
   const [threadPostId, setThreadPostId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [newMessageCount, setNewMessageCount] = useState(0);
 
   // Map location
   const [mapLat, setMapLat] = useState(lat);
@@ -112,6 +113,7 @@ function FeedContent() {
     setPosts([]);
     setCursor(undefined);
     setHasMore(true);
+    setNewMessageCount(0);
 
     fetchPosts().then((data) => {
       setPosts(data.posts ?? []);
@@ -127,9 +129,14 @@ function FeedContent() {
   const handleScroll = useCallback(() => {
     const el = chatContainerRef.current;
     if (!el) return;
-    // Near bottom = within 150px of the bottom
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    shouldAutoScroll.current = distanceFromBottom < 150;
+    const nearBottom = distanceFromBottom < 150;
+    shouldAutoScroll.current = nearBottom;
+
+    // Clear unread count when user scrolls to bottom
+    if (nearBottom) {
+      setNewMessageCount(0);
+    }
   }, []);
 
   // Auto-scroll to bottom when posts change
@@ -141,13 +148,20 @@ function FeedContent() {
     const isNewPost = posts.length > prevPostCount.current;
     prevPostCount.current = posts.length;
 
-    // Always scroll on first load, or when new post arrives and user is near bottom
     if (isNewPost && shouldAutoScroll.current) {
       requestAnimationFrame(() => {
         el.scrollTop = el.scrollHeight;
       });
     }
   }, [posts]);
+
+  const scrollToBottom = useCallback(() => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setNewMessageCount(0);
+    shouldAutoScroll.current = true;
+  }, []);
 
   // Load older posts (scroll up)
   const loadOlder = useCallback(async () => {
@@ -166,7 +180,7 @@ function FeedContent() {
 
     const handleNewPost = (post: PostWithMeta) => {
       setPosts((prev) => {
-        // Replace any optimistic post with matching content, or prepend if from another user
+        // Replace any optimistic post with matching content
         const optimisticIdx = prev.findIndex(
           (p) => p.id.startsWith("optimistic-") && p.content === post.content
         );
@@ -177,6 +191,11 @@ function FeedContent() {
         }
         return [post, ...prev];
       });
+
+      // If user is scrolled up, increment unread count
+      if (!shouldAutoScroll.current) {
+        setNewMessageCount((c) => c + 1);
+      }
     };
 
     const handleFavoriteUpdate = (data: { postId: string; count: number }) => {
@@ -209,22 +228,40 @@ function FeedContent() {
       );
     };
 
+    const handleReactionUpdate = (data: { postId: string; reactions: Record<string, number> }) => {
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== data.postId) return p;
+          // Convert count-only data to full reaction shape, preserving current user's reacted state
+          const updated: Record<string, { count: number; reacted: boolean }> = {};
+          for (const [emoji, count] of Object.entries(data.reactions)) {
+            updated[emoji] = {
+              count,
+              reacted: p.reactions?.[emoji]?.reacted ?? false,
+            };
+          }
+          return { ...p, reactions: updated };
+        })
+      );
+    };
+
     socket.on("new-post", handleNewPost);
     socket.on("favorite-update", handleFavoriteUpdate);
     socket.on("downvote-update", handleDownvoteUpdate);
     socket.on("new-comment", handleNewComment);
+    socket.on("reaction-update", handleReactionUpdate);
 
     return () => {
       socket.off("new-post", handleNewPost);
       socket.off("favorite-update", handleFavoriteUpdate);
       socket.off("downvote-update", handleDownvoteUpdate);
       socket.off("new-comment", handleNewComment);
+      socket.off("reaction-update", handleReactionUpdate);
     };
   }, [socket]);
 
   const handleNewPost = (optimisticPost?: PostWithMeta) => {
     if (optimisticPost) {
-      // Instantly show the post in the feed
       setPosts((prev) => [optimisticPost, ...prev]);
     }
   };
@@ -244,12 +281,10 @@ function FeedContent() {
       {/* Top bar */}
       <div className="flex-shrink-0 border-b border-brand-800 bg-brand-950/95 backdrop-blur-md">
         <div className="flex items-center h-12 px-4">
-          {/* Logo */}
           <span className="text-lg font-bold text-white tracking-tight mr-4">
             Chatterfall
           </span>
 
-          {/* Channel-style info */}
           <div className="flex items-center gap-2 text-sm text-gray-400 mr-auto">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -258,12 +293,11 @@ function FeedContent() {
             <span className="hidden sm:inline">
               {usingMapLocation ? "Custom location" : "Your area"}
               {filters.range > 0
-                ? ` • ${filters.range >= 1609 ? `${(filters.range / 1609).toFixed(1)} mi` : `${Math.round(filters.range)}m`}`
-                : " • All posts"}
+                ? ` \u2022 ${filters.range >= 1609 ? `${(filters.range / 1609).toFixed(1)} mi` : `${Math.round(filters.range)}m`}`
+                : " \u2022 All posts"}
             </span>
           </div>
 
-          {/* Right buttons */}
           <div className="flex items-center gap-1">
             {usingMapLocation && (
               <button
@@ -320,7 +354,6 @@ function FeedContent() {
           </div>
         </div>
 
-        {/* Filters bar (collapsible) */}
         {filtersOpen && (
           <div className="border-t border-brand-800 px-4 py-2">
             <FeedFilters filters={filters} onChange={setFilters} />
@@ -330,7 +363,7 @@ function FeedContent() {
 
       {/* Main content area */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Left sidebar - Nearby Users (hidden on mobile) */}
+        {/* Left sidebar - Nearby Users */}
         <div className="hidden lg:flex w-[200px] flex-shrink-0 border-r border-brand-800 bg-brand-900/30 flex-col overflow-y-auto">
           <NearbyUsers
             posts={posts}
@@ -339,14 +372,13 @@ function FeedContent() {
         </div>
 
         {/* Chat area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 relative">
           {/* Messages */}
           <div
             ref={chatContainerRef}
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto px-4 py-2"
           >
-            {/* Load older button */}
             {hasMore && (
               <div className="text-center py-3">
                 <button
@@ -359,7 +391,6 @@ function FeedContent() {
               </div>
             )}
 
-            {/* Posts oldest→newest (newest at bottom) */}
             <div className="flex flex-col">
               {[...posts].reverse().map((post) => (
                 <ChatMessage
@@ -383,7 +414,14 @@ function FeedContent() {
             )}
           </div>
 
-          {/* Chat input at bottom */}
+          {/* New messages pill */}
+          <NewMessagesPill
+            count={newMessageCount}
+            onClick={scrollToBottom}
+            visible={newMessageCount > 0}
+          />
+
+          {/* Chat input */}
           <div className="flex-shrink-0 border-t border-brand-800 bg-brand-950/80 px-4 py-3">
             <ChatInput
               lat={lat}
@@ -395,7 +433,7 @@ function FeedContent() {
           </div>
         </div>
 
-        {/* Thread panel (right side) */}
+        {/* Thread panel */}
         {threadPostId && (
           <div className="hidden sm:flex w-[380px] flex-shrink-0 border-l border-brand-800 bg-brand-950 flex-col">
             <ThreadPanel
@@ -410,7 +448,6 @@ function FeedContent() {
           </div>
         )}
 
-        {/* Thread overlay on mobile */}
         {threadPostId && (
           <div className="sm:hidden fixed inset-0 z-50 bg-brand-950 flex flex-col">
             <ThreadPanel
@@ -425,7 +462,6 @@ function FeedContent() {
           </div>
         )}
 
-        {/* Map panel */}
         {mapOpen && (
           <div className="hidden md:flex w-[420px] flex-shrink-0 border-l border-brand-800 bg-brand-950 flex-col">
             <MapPanel

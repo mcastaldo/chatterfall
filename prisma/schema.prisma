@@ -22,6 +22,7 @@ model User {
   comments          Comment[]
   favorites         Favorite[]
   downvotes         Downvote[]
+  reactions         Reaction[]
   commentFavorites  CommentFavorite[]
   commentDownvotes  CommentDownvote[]
   sentMessages      DirectMessage[]    @relation("SentMessages")
@@ -32,14 +33,15 @@ model User {
 }
 
 model Post {
-  id        String   @id @default(cuid())
-  content   String
-  imageUrl  String?
-  lat       Float
-  lon       Float
-  anonymous Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  content      String
+  imageUrl     String?
+  lat          Float
+  lon          Float
+  anonymous    Boolean  @default(false)
+  locationName String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   authorId String?
   author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
@@ -47,6 +49,7 @@ model Post {
   comments      Comment[]
   favorites     Favorite[]
   downvotes     Downvote[]
+  reactions     Reaction[]
   notifications Notification[]
 
   @@index([lat, lon])
@@ -99,6 +102,21 @@ model Downvote {
 
   @@unique([userId, postId])
   @@map("downvotes")
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId, emoji])
+  @@index([postId])
+  @@map("reactions")
 }
 
 model CommentFavorite {

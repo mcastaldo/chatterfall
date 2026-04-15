@@ -22,6 +22,8 @@ export interface PostWithMeta {
   favorited?: boolean;
   downvoted?: boolean;
   distance?: number;
+  locationName?: string | null;
+  reactions?: Record<string, { count: number; reacted: boolean }>;
 }
 
 export interface CommentWithMeta {
@@ -89,6 +91,7 @@ export interface ServerToClientEvents {
   "new-comment": (data: { postId: string; comment: CommentWithMeta }) => void;
   "favorite-update": (data: { postId: string; count: number }) => void;
   "downvote-update": (data: { postId: string; count: number }) => void;
+  "reaction-update": (data: { postId: string; reactions: Record<string, number> }) => void;
   "comment-favorite-update": (data: { commentId: string; count: number }) => void;
   "comment-downvote-update": (data: { commentId: string; count: number }) => void;
   "new-message": (message: MessageData) => void;

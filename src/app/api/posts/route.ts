@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { haversineDistance } from "@/lib/geo";
+import { reverseGeocode } from "@/lib/geocode";
 
 export async function GET(req: NextRequest) {
   try {
@@ -55,6 +56,9 @@ export async function GET(req: NextRequest) {
             downvotes: true,
           },
         },
+        reactions: {
+          select: { emoji: true, userId: true },
+        },
         ...(session
           ? {
               favorites: {
@@ -75,12 +79,26 @@ export async function GET(req: NextRequest) {
         lat !== null && lon !== null && post.lat !== null && post.lon !== null
           ? haversineDistance(lat, lon, post.lat, post.lon)
           : undefined;
+
+      // Aggregate reactions into { emoji: { count, reacted } }
+      const reactionMap: Record<string, { count: number; reacted: boolean }> = {};
+      for (const r of post.reactions) {
+        if (!reactionMap[r.emoji]) {
+          reactionMap[r.emoji] = { count: 0, reacted: false };
+        }
+        reactionMap[r.emoji].count++;
+        if (session && r.userId === session.userId) {
+          reactionMap[r.emoji].reacted = true;
+        }
+      }
+
       return {
         ...post,
         favorited: session ? post.favorites?.length > 0 : false,
         downvoted: session ? post.downvotes?.length > 0 : false,
         favorites: undefined,
         downvotes: undefined,
+        reactions: reactionMap,
         distance,
       };
     });
@@ -130,6 +148,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Reverse geocode the location (non-blocking, uses cache)
+    let locationName: string | null = null;
+    try {
+      locationName = await reverseGeocode(lat, lon);
+    } catch {
+      // Silent fail — location name is optional
+    }
+
     const post = await prisma.post.create({
       data: {
         content,
@@ -137,6 +163,7 @@ export async function POST(req: NextRequest) {
         lat,
         lon,
         anonymous: !!anonymous,
+        locationName,
         ...(session && !anonymous ? { authorId: session.userId } : {}),
       },
       include: {
@@ -160,7 +187,7 @@ export async function POST(req: NextRequest) {
 
     // Broadcast to all connected clients
     const { broadcast } = await import("@/lib/broadcast");
-    await broadcast("new-post", post);
+    await broadcast("new-post", { ...post, reactions: {} });
 
     return NextResponse.json(post, { status: 201 });
   } catch (error) {
