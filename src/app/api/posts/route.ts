@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { haversineDistance } from "@/lib/geo";
+import { haversineDistance, fuzzCoordinates } from "@/lib/geo";
 import { reverseGeocode } from "@/lib/geocode";
 
 export async function GET(req: NextRequest) {
@@ -92,8 +92,13 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Fuzz coordinates for privacy (~200m offset, deterministic per post)
+      const fuzzed = fuzzCoordinates(post.lat, post.lon, post.id);
+
       return {
         ...post,
+        lat: fuzzed.lat,
+        lon: fuzzed.lon,
         favorited: session ? post.favorites?.length > 0 : false,
         downvoted: session ? post.downvotes?.length > 0 : false,
         favorites: undefined,
@@ -185,9 +190,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Broadcast to all connected clients
+    // Broadcast with fuzzed coordinates for privacy
     const { broadcast } = await import("@/lib/broadcast");
-    await broadcast("new-post", { ...post, reactions: {} });
+    const broadcastFuzzed = fuzzCoordinates(post.lat, post.lon, post.id);
+    await broadcast("new-post", {
+      ...post,
+      lat: broadcastFuzzed.lat,
+      lon: broadcastFuzzed.lon,
+      reactions: {},
+    });
 
     return NextResponse.json(post, { status: 201 });
   } catch (error) {

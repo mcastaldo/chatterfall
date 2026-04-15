@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { fuzzCoordinates } from "@/lib/geo";
 
 export async function GET(
   req: NextRequest,
@@ -47,8 +48,12 @@ export async function GET(
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
+    const fuzzed = fuzzCoordinates(post.lat, post.lon, post.id);
+
     return NextResponse.json({
       ...post,
+      lat: fuzzed.lat,
+      lon: fuzzed.lon,
       favorited: session ? (post as unknown as { favorites: unknown[] }).favorites?.length > 0 : false,
       downvoted: session ? (post as unknown as { downvotes: unknown[] }).downvotes?.length > 0 : false,
       favorites: undefined,

@@ -18,6 +18,35 @@ export function haversineDistance(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/**
+ * Add random noise to coordinates (~200m radius) for privacy.
+ * Uses a deterministic seed from the post ID so the same post always
+ * gets the same fuzzed location (no jitter on re-fetches).
+ */
+export function fuzzCoordinates(
+  lat: number,
+  lon: number,
+  seed: string
+): { lat: number; lon: number } {
+  // Simple hash from seed string to get deterministic "random" values
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
+  }
+  // Two pseudo-random values from the hash
+  const r1 = ((h & 0xffff) / 0xffff) * 2 - 1; // -1 to 1
+  const r2 = (((h >>> 16) & 0xffff) / 0xffff) * 2 - 1; // -1 to 1
+
+  // ~200m offset: 0.002 degrees ≈ 200m at mid-latitudes
+  const offsetLat = r1 * 0.002;
+  const offsetLon = r2 * 0.002;
+
+  return {
+    lat: lat + offsetLat,
+    lon: lon + offsetLon,
+  };
+}
+
 /** Convert feet to meters */
 export function feetToMeters(feet: number): number {
   return feet * 0.3048;
