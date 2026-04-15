@@ -26,7 +26,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Login failed. Please try again.");
+        setError(data.detail || data.error || "Login failed. Please try again.");
         return;
       }
 
