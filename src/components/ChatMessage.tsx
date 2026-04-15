@@ -86,6 +86,14 @@ export default function ChatMessage({
             </span>
           )}
           <span className="text-xs text-gray-500">{timestamp}</span>
+          {post.distance != null && (
+            <span className="text-[11px] text-gray-500">
+              •{" "}
+              {post.distance < 1
+                ? `${Math.round(post.distance * 1000)}m away`
+                : `${post.distance.toFixed(1)}km away`}
+            </span>
+          )}
         </div>
 
         {/* Message content */}
@@ -176,14 +184,6 @@ export default function ChatMessage({
             )}
           </button>
 
-          {/* Distance badge */}
-          {post.distance != null && (
-            <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] text-gray-500 bg-brand-800/50">
-              {post.distance < 1
-                ? `${Math.round(post.distance * 1000)}m`
-                : `${post.distance.toFixed(1)}km`}
-            </span>
-          )}
         </div>
       </div>
     </div>
