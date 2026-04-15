@@ -159,6 +159,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Broadcast to all connected clients
+    const { broadcast } = await import("@/lib/broadcast");
+    await broadcast("new-post", post);
+
     return NextResponse.json(post, { status: 201 });
   } catch (error) {
     console.error("Create post error:", error);

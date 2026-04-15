@@ -23,23 +23,23 @@ const MapPanel = dynamic(() => import("@/components/MapPanel"), {
 });
 
 function useSocket(userId: string | null, lat: number, lon: number) {
-  const socketRef = useRef<Socket | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const socket = io();
-    socketRef.current = socket;
+    const s = io();
+    setSocket(s);
 
-    socket.on("connect", () => {
-      socket.emit("join", { userId, lat, lon });
+    s.on("connect", () => {
+      s.emit("join", { userId, lat, lon });
     });
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      s.disconnect();
+      setSocket(null);
     };
   }, [userId, lat, lon]);
 
-  return socketRef;
+  return socket;
 }
 
 function FeedContent() {
@@ -75,7 +75,7 @@ function FeedContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const socketRef = useSocket(user?.id ?? null, lat, lon);
+  const socket = useSocket(user?.id ?? null, lat, lon);
 
   // Fetch current user
   useEffect(() => {
@@ -121,15 +121,18 @@ function FeedContent() {
     });
   }, [fetchPosts]);
 
-  // Check if user is near the bottom of the chat (within 150px)
-  const isNearBottom = useCallback(() => {
+  // Track if user is near bottom so we can auto-scroll on new messages
+  const shouldAutoScroll = useRef(true);
+
+  const handleScroll = useCallback(() => {
     const el = chatContainerRef.current;
-    if (!el) return true;
-    // For flex-col-reverse, scrollTop 0 means at the bottom
-    return el.scrollTop >= -150;
+    if (!el) return;
+    // Near bottom = within 150px of the bottom
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    shouldAutoScroll.current = distanceFromBottom < 150;
   }, []);
 
-  // Auto-scroll to bottom on initial load and when new posts arrive
+  // Auto-scroll to bottom when posts change
   const prevPostCount = useRef(0);
   useEffect(() => {
     const el = chatContainerRef.current;
@@ -138,11 +141,13 @@ function FeedContent() {
     const isNewPost = posts.length > prevPostCount.current;
     prevPostCount.current = posts.length;
 
-    // Always scroll on initial load, or if user is near bottom when new post arrives
-    if (!cursor || (isNewPost && isNearBottom())) {
-      el.scrollTop = 0; // flex-col-reverse: 0 = bottom
+    // Always scroll on first load, or when new post arrives and user is near bottom
+    if (isNewPost && shouldAutoScroll.current) {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
     }
-  }, [posts, cursor, isNearBottom]);
+  }, [posts]);
 
   // Load older posts (scroll up)
   const loadOlder = useCallback(async () => {
@@ -157,7 +162,6 @@ function FeedContent() {
 
   // Socket events
   useEffect(() => {
-    const socket = socketRef.current;
     if (!socket) return;
 
     const handleNewPost = (post: PostWithMeta) => {
@@ -204,7 +208,7 @@ function FeedContent() {
       socket.off("favorite-update", handleFavoriteUpdate);
       socket.off("downvote-update", handleDownvoteUpdate);
     };
-  }, [socketRef]);
+  }, [socket]);
 
   const handleNewPost = (optimisticPost?: PostWithMeta) => {
     if (optimisticPost) {
@@ -327,6 +331,7 @@ function FeedContent() {
           {/* Messages */}
           <div
             ref={chatContainerRef}
+            onScroll={handleScroll}
             className="flex-1 overflow-y-auto px-4 py-2"
           >
             {/* Load older button */}
@@ -342,10 +347,9 @@ function FeedContent() {
               </div>
             )}
 
-            {/* Posts in reverse chronological (newest at bottom) */}
-            <div className="flex flex-col-reverse">
-              <div ref={messagesEndRef} />
-              {posts.map((post) => (
+            {/* Posts oldest→newest (newest at bottom) */}
+            <div className="flex flex-col">
+              {[...posts].reverse().map((post) => (
                 <ChatMessage
                   key={post.id}
                   post={post}
@@ -353,6 +357,7 @@ function FeedContent() {
                   onThreadOpen={(id) => setThreadPostId(id)}
                 />
               ))}
+              <div ref={messagesEndRef} />
             </div>
 
             {!loading && posts.length === 0 && (
