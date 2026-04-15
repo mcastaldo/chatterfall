@@ -121,12 +121,28 @@ function FeedContent() {
     });
   }, [fetchPosts]);
 
-  // Scroll to bottom on initial load or new post
+  // Check if user is near the bottom of the chat (within 150px)
+  const isNearBottom = useCallback(() => {
+    const el = chatContainerRef.current;
+    if (!el) return true;
+    // For flex-col-reverse, scrollTop 0 means at the bottom
+    return el.scrollTop >= -150;
+  }, []);
+
+  // Auto-scroll to bottom on initial load and when new posts arrive
+  const prevPostCount = useRef(0);
   useEffect(() => {
-    if (messagesEndRef.current && posts.length > 0 && !cursor) {
-      // Only auto-scroll on initial load
+    const el = chatContainerRef.current;
+    if (!el || posts.length === 0) return;
+
+    const isNewPost = posts.length > prevPostCount.current;
+    prevPostCount.current = posts.length;
+
+    // Always scroll on initial load, or if user is near bottom when new post arrives
+    if (!cursor || (isNewPost && isNearBottom())) {
+      el.scrollTop = 0; // flex-col-reverse: 0 = bottom
     }
-  }, [posts, cursor]);
+  }, [posts, cursor, isNearBottom]);
 
   // Load older posts (scroll up)
   const loadOlder = useCallback(async () => {
