@@ -199,14 +199,26 @@ function FeedContent() {
       );
     };
 
+    const handleNewComment = (data: { postId: string; commentCount: number }) => {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === data.postId
+            ? { ...p, _count: { ...p._count, comments: data.commentCount } }
+            : p
+        )
+      );
+    };
+
     socket.on("new-post", handleNewPost);
     socket.on("favorite-update", handleFavoriteUpdate);
     socket.on("downvote-update", handleDownvoteUpdate);
+    socket.on("new-comment", handleNewComment);
 
     return () => {
       socket.off("new-post", handleNewPost);
       socket.off("favorite-update", handleFavoriteUpdate);
       socket.off("downvote-update", handleDownvoteUpdate);
+      socket.off("new-comment", handleNewComment);
     };
   }, [socket]);
 

@@ -112,6 +112,33 @@ export default function ChatMessage({
           />
         )}
 
+        {/* Reply indicator - always visible when there are comments */}
+        {post._count.comments > 0 && (
+          <button
+            onClick={() => onThreadOpen(post.id)}
+            className="flex items-center gap-1.5 mt-1.5 text-brand-400 hover:text-brand-300 transition-colors group/reply"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="w-3.5 h-3.5"
+            >
+              <path
+                fillRule="evenodd"
+                d="M2 10c0-3.967 3.69-7 8-7 4.31 0 8 3.033 8 7s-3.69 7-8 7a9.165 9.165 0 01-1.504-.123 5.976 5.976 0 01-3.935 1.107.75.75 0 01-.584-1.143 3.478 3.478 0 00.522-1.756C2.979 13.825 2 12.025 2 10z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="text-xs font-medium">
+              {formatCount(post._count.comments)} {post._count.comments === 1 ? "reply" : "replies"}
+            </span>
+            <span className="text-[11px] text-gray-500 group-hover/reply:text-brand-400 transition-colors">
+              — View thread
+            </span>
+          </button>
+        )}
+
         {/* Action row - visible on hover */}
         <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {/* Favorite */}

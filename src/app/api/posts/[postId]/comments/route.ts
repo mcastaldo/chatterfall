@@ -139,6 +139,11 @@ export async function POST(
       });
     }
 
+    // Broadcast new comment + updated count to all clients
+    const { broadcast } = await import("@/lib/broadcast");
+    const commentCount = await prisma.comment.count({ where: { postId } });
+    await broadcast("new-comment", { postId, comment, commentCount });
+
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
     console.error("Create comment error:", error);
