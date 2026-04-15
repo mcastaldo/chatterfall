@@ -161,7 +161,18 @@ function FeedContent() {
     if (!socket) return;
 
     const handleNewPost = (post: PostWithMeta) => {
-      setPosts((prev) => [post, ...prev]);
+      setPosts((prev) => {
+        // Replace any optimistic post with matching content, or prepend if from another user
+        const optimisticIdx = prev.findIndex(
+          (p) => p.id.startsWith("optimistic-") && p.content === post.content
+        );
+        if (optimisticIdx !== -1) {
+          const updated = [...prev];
+          updated[optimisticIdx] = post;
+          return updated;
+        }
+        return [post, ...prev];
+      });
     };
 
     const handleFavoriteUpdate = (data: { postId: string; count: number }) => {
@@ -195,12 +206,11 @@ function FeedContent() {
     };
   }, [socketRef]);
 
-  const handleNewPost = () => {
-    fetchPosts().then((data) => {
-      setPosts(data.posts ?? []);
-      setCursor(data.nextCursor);
-      setHasMore(!!data.nextCursor);
-    });
+  const handleNewPost = (optimisticPost?: PostWithMeta) => {
+    if (optimisticPost) {
+      // Instantly show the post in the feed
+      setPosts((prev) => [optimisticPost, ...prev]);
+    }
   };
 
   const handleMapLocationChange = (newLat: number, newLon: number) => {
@@ -362,6 +372,7 @@ function FeedContent() {
               lat={lat}
               lon={lon}
               isLoggedIn={!!user}
+              user={user}
               onPost={handleNewPost}
             />
           </div>

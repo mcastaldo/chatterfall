@@ -6,13 +6,15 @@ interface ChatInputProps {
   lat: number;
   lon: number;
   isLoggedIn: boolean;
-  onPost: () => void;
+  user?: { id: string; username: string; displayName: string; profileImg: string | null } | null;
+  onPost: (optimisticPost?: any) => void;
 }
 
 export default function ChatInput({
   lat,
   lon,
   isLoggedIn,
+  user,
   onPost,
 }: ChatInputProps) {
   const [content, setContent] = useState("");
@@ -66,13 +68,41 @@ export default function ChatInput({
     if (!trimmed || submitting) return;
 
     setSubmitting(true);
+
+    // Optimistic: show post immediately
+    const optimisticPost = {
+      id: `optimistic-${Date.now()}`,
+      content: trimmed,
+      imageUrl: imagePreview,
+      lat,
+      lon,
+      anonymous,
+      createdAt: new Date().toISOString(),
+      author: anonymous ? null : user ?? null,
+      _count: { comments: 0, favorites: 0, downvotes: 0 },
+      favorited: false,
+      downvoted: false,
+      distance: 0,
+    };
+
+    // Clear input immediately for snappy feel
+    setContent("");
+    const savedImage = imageFile;
+    removeImage();
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+
+    // Show it in the feed right away
+    onPost(optimisticPost);
+
     try {
       let imageUrl: string | null = null;
 
-      // Upload image first if present
-      if (imageFile) {
+      // Upload image if present
+      if (savedImage) {
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", savedImage);
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
           body: formData,
@@ -83,7 +113,7 @@ export default function ChatInput({
         }
       }
 
-      const res = await fetch("/api/posts", {
+      await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -94,17 +124,8 @@ export default function ChatInput({
           imageUrl,
         }),
       });
-
-      if (res.ok) {
-        setContent("");
-        removeImage();
-        if (textareaRef.current) {
-          textareaRef.current.style.height = "auto";
-        }
-        onPost();
-      }
     } catch {
-      // ignore
+      // ignore - post already shown optimistically
     } finally {
       setSubmitting(false);
     }
