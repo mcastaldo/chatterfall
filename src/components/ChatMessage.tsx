@@ -89,9 +89,11 @@ export default function ChatMessage({
           {post.distance != null && (
             <span className="text-[11px] text-gray-500">
               •{" "}
-              {post.distance < 1
-                ? `${Math.round(post.distance * 1000)}m away`
-                : `${post.distance.toFixed(1)}km away`}
+              {post.distance < 1000
+                ? `${Math.round(post.distance)}m away`
+                : post.distance < 1609
+                  ? `${(post.distance / 1000).toFixed(1)}km away`
+                  : `${(post.distance / 1609).toFixed(1)}mi away`}
             </span>
           )}
         </div>
