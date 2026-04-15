@@ -1,0 +1,23 @@
+node_modules/
+.next/
+server/dist/
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Old app files
+chatterfall-1/
+chatterfall-1.zip
+*.pem
+*.ppk
+*.psd
+walrusopenssh
+ImageManipulator.php
+jquery.confirm/
+jquery.validate.js
+chatterfall gifs/
+icons/
+.claude/
