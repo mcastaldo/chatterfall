@@ -6,6 +6,10 @@ import { Server } from "socket.io";
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT || "3000", 10);
 
+// Debug: log DATABASE_URL prefix on startup
+const dbUrl = process.env.DATABASE_URL || "(not set)";
+console.log(`DATABASE_URL starts with: ${dbUrl.substring(0, 15)}... (length: ${dbUrl.length})`);
+
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
