@@ -199,14 +199,13 @@ function PostDetailContent() {
           )}
         </div>
 
-        {user && (
-          <CommentComposer
-            postId={postId}
-            lat={lat}
-            lon={lon}
-            onComment={handleNewComment}
-          />
-        )}
+        <CommentComposer
+          postId={postId}
+          lat={lat}
+          lon={lon}
+          onComment={handleNewComment}
+          isLoggedIn={!!user}
+        />
       </main>
     </div>
   );

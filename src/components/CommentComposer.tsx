@@ -7,6 +7,7 @@ interface CommentComposerProps {
   lat: number;
   lon: number;
   onComment?: () => void;
+  isLoggedIn?: boolean;
 }
 
 export default function CommentComposer({
@@ -14,11 +15,13 @@ export default function CommentComposer({
   lat,
   lon,
   onComment,
+  isLoggedIn = false,
 }: CommentComposerProps) {
   const [content, setContent] = useState("");
-  const [anonymous, setAnonymous] = useState(false);
+  const [anonymous, setAnonymous] = useState(!isLoggedIn);
   const [loading, setLoading] = useState(false);
 
+  const isAnonymous = !isLoggedIn || anonymous;
   const canSubmit = content.trim().length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +35,7 @@ export default function CommentComposer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: content.trim(),
-          anonymous,
+          anonymous: isAnonymous,
           lat,
           lon,
         }),
@@ -40,7 +43,7 @@ export default function CommentComposer({
 
       if (res.ok) {
         setContent("");
-        setAnonymous(false);
+        if (isLoggedIn) setAnonymous(false);
         onComment?.();
       }
     } finally {
@@ -56,21 +59,25 @@ export default function CommentComposer({
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        placeholder="Write a comment..."
+        placeholder={isLoggedIn ? "Write a comment..." : "Comment anonymously..."}
         rows={2}
         className="w-full resize-none rounded-lg bg-brand-950/50 border border-brand-800/50 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 transition-colors"
       />
 
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={anonymous}
-            onChange={(e) => setAnonymous(e.target.checked)}
-            className="rounded border-brand-700 bg-brand-950 text-brand-500 focus:ring-brand-500"
-          />
-          Anonymous
-        </label>
+        {isLoggedIn ? (
+          <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={anonymous}
+              onChange={(e) => setAnonymous(e.target.checked)}
+              className="rounded border-brand-700 bg-brand-950 text-brand-500 focus:ring-brand-500"
+            />
+            Anonymous
+          </label>
+        ) : (
+          <span className="text-xs text-gray-500">Commenting as Anonymous</span>
+        )}
 
         <button
           type="submit"

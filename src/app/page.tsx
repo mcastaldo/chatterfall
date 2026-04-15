@@ -165,9 +165,7 @@ function FeedContent() {
       <NavBar user={user} />
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {user && (
-          <PostComposer lat={lat} lon={lon} onPost={handleNewPost} />
-        )}
+        <PostComposer lat={lat} lon={lon} onPost={handleNewPost} isLoggedIn={!!user} />
 
         <FeedFilters filters={filters} onChange={setFilters} />
 
