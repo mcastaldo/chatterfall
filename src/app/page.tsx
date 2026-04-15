@@ -3,15 +3,16 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { io, Socket } from "socket.io-client";
+import { useRouter } from "next/navigation";
 import { LocationGate, useLocation } from "@/components/LocationGate";
 import NavBar from "@/components/NavBar";
-import PostComposer from "@/components/PostComposer";
-import PostCard from "@/components/PostCard";
+import ChatMessage from "@/components/ChatMessage";
+import ChatInput from "@/components/ChatInput";
+import NearbyUsers from "@/components/NearbyUsers";
+import ThreadPanel from "@/components/ThreadPanel";
 import FeedFilters from "@/components/FeedFilters";
-import InfiniteScroll from "@/components/InfiniteScroll";
 import type { PostWithMeta, FeedFilters as FeedFiltersType } from "@/types";
 
-// Dynamic import for MapPanel (Leaflet doesn't support SSR)
 const MapPanel = dynamic(() => import("@/components/MapPanel"), {
   ssr: false,
   loading: () => (
@@ -43,6 +44,7 @@ function useSocket(userId: string | null, lat: number, lon: number) {
 
 function FeedContent() {
   const { lat, lon } = useLocation();
+  const router = useRouter();
   const [user, setUser] = useState<{
     id: string;
     username: string;
@@ -60,15 +62,18 @@ function FeedContent() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [threadPostId, setThreadPostId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // Custom map location (when user moves the marker on the map)
+  // Map location
   const [mapLat, setMapLat] = useState(lat);
   const [mapLon, setMapLon] = useState(lon);
   const [usingMapLocation, setUsingMapLocation] = useState(false);
-
-  // The effective lat/lon for fetching posts
   const effectiveLat = usingMapLocation ? mapLat : lat;
   const effectiveLon = usingMapLocation ? mapLon : lon;
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const socketRef = useSocket(user?.id ?? null, lat, lon);
 
@@ -116,8 +121,15 @@ function FeedContent() {
     });
   }, [fetchPosts]);
 
-  // Load more for infinite scroll
-  const loadMore = useCallback(async () => {
+  // Scroll to bottom on initial load or new post
+  useEffect(() => {
+    if (messagesEndRef.current && posts.length > 0 && !cursor) {
+      // Only auto-scroll on initial load
+    }
+  }, [posts, cursor]);
+
+  // Load older posts (scroll up)
+  const loadOlder = useCallback(async () => {
     if (!cursor || loading) return;
     setLoading(true);
     const data = await fetchPosts(cursor);
@@ -181,114 +193,220 @@ function FeedContent() {
     setUsingMapLocation(true);
   };
 
-  const handleMapClose = () => {
-    setMapOpen(false);
-  };
-
-  const handleResetLocation = () => {
-    setUsingMapLocation(false);
-    setMapLat(lat);
-    setMapLon(lon);
-  };
+  const threadPost = threadPostId
+    ? posts.find((p) => p.id === threadPostId) ?? null
+    : null;
 
   return (
-    <div className="min-h-screen flex">
-      {/* Main feed */}
-      <div className="flex-1 min-w-0">
-        <NavBar user={user} />
+    <div className="h-screen flex flex-col overflow-hidden">
+      {/* Top bar */}
+      <div className="flex-shrink-0 border-b border-brand-800 bg-brand-950/95 backdrop-blur-md">
+        <div className="flex items-center h-12 px-4">
+          {/* Logo */}
+          <span className="text-lg font-bold text-white tracking-tight mr-4">
+            Chatterfall
+          </span>
 
-        <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-          <PostComposer lat={lat} lon={lon} onPost={handleNewPost} isLoggedIn={!!user} />
+          {/* Channel-style info */}
+          <div className="flex items-center gap-2 text-sm text-gray-400 mr-auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span className="hidden sm:inline">
+              {usingMapLocation ? "Custom location" : "Your area"}
+              {filters.range > 0
+                ? ` • ${filters.range >= 1609 ? `${(filters.range / 1609).toFixed(1)} mi` : `${Math.round(filters.range)}m`}`
+                : " • All posts"}
+            </span>
+          </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <FeedFilters filters={filters} onChange={setFilters} />
-            </div>
-            {/* Map toggle button */}
+          {/* Right buttons */}
+          <div className="flex items-center gap-1">
+            {usingMapLocation && (
+              <button
+                onClick={() => { setUsingMapLocation(false); setMapLat(lat); setMapLon(lon); }}
+                className="text-xs text-brand-400 hover:text-brand-300 px-2 py-1"
+              >
+                Reset location
+              </button>
+            )}
+            <button
+              onClick={() => setFiltersOpen(!filtersOpen)}
+              className={`p-2 rounded-lg transition-colors ${filtersOpen ? "bg-brand-800 text-white" : "text-gray-400 hover:text-white"}`}
+              title="Filters"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+                <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+                <line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" />
+                <line x1="17" y1="16" x2="23" y2="16" />
+              </svg>
+            </button>
             <button
               onClick={() => setMapOpen(!mapOpen)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-                mapOpen
-                  ? "bg-brand-500 text-white"
-                  : "bg-brand-900/50 border border-brand-800 text-gray-300 hover:text-white hover:border-brand-600"
-              }`}
+              className={`p-2 rounded-lg transition-colors ${mapOpen ? "bg-brand-800 text-white" : "text-gray-400 hover:text-white"}`}
+              title="Map"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                 <circle cx="12" cy="10" r="3" />
               </svg>
-              Map
             </button>
-          </div>
-
-          {/* Map location indicator */}
-          {usingMapLocation && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-800/50 border border-brand-700 text-sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-brand-400 flex-shrink-0">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              <span className="text-gray-300">
-                Viewing posts from map location
-              </span>
+            {user ? (
               <button
-                onClick={handleResetLocation}
-                className="ml-auto text-xs text-brand-400 hover:text-brand-300 font-medium"
+                onClick={() => router.push(`/profile/${user.id}`)}
+                className="p-1 ml-1"
               >
-                Reset to my location
+                <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white overflow-hidden">
+                  {user.profileImg ? (
+                    <img src={user.profileImg} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (user.displayName || user.username).charAt(0).toUpperCase()
+                  )}
+                </div>
               </button>
-            </div>
-          )}
+            ) : (
+              <button
+                onClick={() => router.push("/login")}
+                className="text-sm text-brand-400 hover:text-brand-300 px-2 py-1 ml-1"
+              >
+                Login
+              </button>
+            )}
+          </div>
+        </div>
 
-          <InfiniteScroll loadMore={loadMore} hasMore={hasMore}>
-            <div className="space-y-4">
+        {/* Filters bar (collapsible) */}
+        {filtersOpen && (
+          <div className="border-t border-brand-800 px-4 py-2">
+            <FeedFilters filters={filters} onChange={setFilters} />
+          </div>
+        )}
+      </div>
+
+      {/* Main content area */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Left sidebar - Nearby Users (hidden on mobile) */}
+        <div className="hidden lg:flex w-[200px] flex-shrink-0 border-r border-brand-800 bg-brand-900/30 flex-col overflow-y-auto">
+          <NearbyUsers
+            posts={posts}
+            onUserClick={(userId) => router.push(`/profile/${userId}`)}
+          />
+        </div>
+
+        {/* Chat area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Messages */}
+          <div
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto px-4 py-2"
+          >
+            {/* Load older button */}
+            {hasMore && (
+              <div className="text-center py-3">
+                <button
+                  onClick={loadOlder}
+                  disabled={loading}
+                  className="text-xs text-brand-400 hover:text-brand-300 disabled:opacity-50"
+                >
+                  {loading ? "Loading..." : "Load older messages"}
+                </button>
+              </div>
+            )}
+
+            {/* Posts in reverse chronological (newest at bottom) */}
+            <div className="flex flex-col-reverse">
+              <div ref={messagesEndRef} />
               {posts.map((post) => (
-                <PostCard
+                <ChatMessage
                   key={post.id}
                   post={post}
                   currentUserId={user?.id}
+                  onThreadOpen={(id) => setThreadPostId(id)}
                 />
               ))}
-              {!loading && posts.length === 0 && (
-                <div className="text-center text-gray-400 py-12">
-                  <p className="text-lg">No posts nearby yet.</p>
-                  <p className="text-sm mt-2">
-                    Be the first to post something!
-                  </p>
-                </div>
-              )}
             </div>
-          </InfiniteScroll>
-        </main>
+
+            {!loading && posts.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 mb-3 text-brand-700">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <p className="text-lg font-medium">No messages yet</p>
+                <p className="text-sm mt-1">Be the first to say something!</p>
+              </div>
+            )}
+          </div>
+
+          {/* Chat input at bottom */}
+          <div className="flex-shrink-0 border-t border-brand-800 bg-brand-950/80 px-4 py-3">
+            <ChatInput
+              lat={lat}
+              lon={lon}
+              isLoggedIn={!!user}
+              onPost={handleNewPost}
+            />
+          </div>
+        </div>
+
+        {/* Thread panel (right side) */}
+        {threadPostId && (
+          <div className="hidden sm:flex w-[380px] flex-shrink-0 border-l border-brand-800 bg-brand-950 flex-col">
+            <ThreadPanel
+              postId={threadPostId}
+              post={threadPost}
+              currentUserId={user?.id}
+              lat={lat}
+              lon={lon}
+              isLoggedIn={!!user}
+              onClose={() => setThreadPostId(null)}
+            />
+          </div>
+        )}
+
+        {/* Thread overlay on mobile */}
+        {threadPostId && (
+          <div className="sm:hidden fixed inset-0 z-50 bg-brand-950 flex flex-col">
+            <ThreadPanel
+              postId={threadPostId}
+              post={threadPost}
+              currentUserId={user?.id}
+              lat={lat}
+              lon={lon}
+              isLoggedIn={!!user}
+              onClose={() => setThreadPostId(null)}
+            />
+          </div>
+        )}
+
+        {/* Map panel */}
+        {mapOpen && (
+          <div className="hidden md:flex w-[420px] flex-shrink-0 border-l border-brand-800 bg-brand-950 flex-col">
+            <MapPanel
+              posts={posts}
+              userLat={lat}
+              userLon={lon}
+              radius={filters.range}
+              onLocationChange={handleMapLocationChange}
+              onClose={() => setMapOpen(false)}
+            />
+          </div>
+        )}
+        {mapOpen && (
+          <div className="md:hidden fixed inset-0 z-50 bg-brand-950 flex flex-col">
+            <MapPanel
+              posts={posts}
+              userLat={lat}
+              userLon={lon}
+              radius={filters.range}
+              onLocationChange={handleMapLocationChange}
+              onClose={() => setMapOpen(false)}
+            />
+          </div>
+        )}
       </div>
-
-      {/* Map sidebar */}
-      {mapOpen && (
-        <div className="hidden md:flex w-[420px] flex-shrink-0 border-l border-brand-800 bg-brand-950 flex-col sticky top-0 h-screen">
-          <MapPanel
-            posts={posts}
-            userLat={lat}
-            userLon={lon}
-            radius={filters.range}
-            onLocationChange={handleMapLocationChange}
-            onClose={handleMapClose}
-          />
-        </div>
-      )}
-
-      {/* Map overlay on mobile */}
-      {mapOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-brand-950 flex flex-col">
-          <MapPanel
-            posts={posts}
-            userLat={lat}
-            userLon={lon}
-            radius={filters.range}
-            onLocationChange={handleMapLocationChange}
-            onClose={handleMapClose}
-          />
-        </div>
-      )}
     </div>
   );
 }
