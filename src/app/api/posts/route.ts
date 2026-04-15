@@ -70,24 +70,23 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    let result = posts.map((post) => ({
-      ...post,
-      favorited: session ? post.favorites?.length > 0 : false,
-      downvoted: session ? post.downvotes?.length > 0 : false,
-      favorites: undefined,
-      downvotes: undefined,
-    }));
+    let result = posts.map((post) => {
+      const distance =
+        lat !== null && lon !== null && post.lat !== null && post.lon !== null
+          ? haversineDistance(lat, lon, post.lat, post.lon)
+          : undefined;
+      return {
+        ...post,
+        favorited: session ? post.favorites?.length > 0 : false,
+        downvoted: session ? post.downvotes?.length > 0 : false,
+        favorites: undefined,
+        downvotes: undefined,
+        distance,
+      };
+    });
 
     if (range > 0 && lat !== null && lon !== null) {
-      result = result
-        .map((post) => {
-          const distance =
-            post.lat !== null && post.lon !== null
-              ? haversineDistance(lat, lon, post.lat, post.lon)
-              : null;
-          return { ...post, distance };
-        })
-        .filter((post) => post.distance !== null && post.distance <= range);
+      result = result.filter((post) => post.distance != null && post.distance <= range);
 
       if (cursor) {
         const cursorIndex = result.findIndex((p) => p.id === cursor);
