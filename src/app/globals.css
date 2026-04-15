@@ -37,3 +37,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(112 68 255);
 }
+
+/* Leaflet marker fixes */
+.leaflet-marker-custom {
+  background: none !important;
+  border: none !important;
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+}
+.leaflet-container {
+  background: rgb(27 13 69);
+}
