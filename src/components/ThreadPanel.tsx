@@ -36,7 +36,7 @@ export default function ThreadPanel({
       const res = await fetch(`/api/posts/${postId}/comments`);
       if (res.ok) {
         const data = await res.json();
-        setComments(data);
+        setComments(data.comments ?? []);
       }
     } catch {
       // ignore
@@ -65,7 +65,7 @@ export default function ThreadPanel({
       const res = await fetch(`/api/posts/${postId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: trimmed, anonymous }),
+        body: JSON.stringify({ content: trimmed, anonymous, lat, lon }),
       });
       if (res.ok) {
         setContent("");
