@@ -89,6 +89,16 @@ export interface FeedFilters {
   search: string;
 }
 
+// Presence
+export interface PresenceEntry {
+  kind: "user" | "anon";
+  id: string;
+  name: string;
+  username?: string;
+  profileImg?: string | null;
+  anonAvatar?: string | null;
+}
+
 // Socket.IO event types
 export interface ServerToClientEvents {
   "new-post": (post: PostWithMeta) => void;
@@ -100,9 +110,21 @@ export interface ServerToClientEvents {
   "comment-downvote-update": (data: { commentId: string; count: number }) => void;
   "new-message": (message: MessageData) => void;
   "notification": (notification: NotificationData) => void;
+  "presence": (entries: PresenceEntry[]) => void;
 }
 
 export interface ClientToServerEvents {
-  "join": (data: { userId?: string; lat: number; lon: number }) => void;
+  "join": (data: {
+    userId?: string;
+    user?: UserPublic | null;
+    anonId?: string | null;
+    anonAvatar?: string | null;
+    lat: number;
+    lon: number;
+  }) => void;
   "update-location": (data: { lat: number; lon: number }) => void;
+  "update-identity": (data: {
+    anonAvatar?: string | null;
+    user?: UserPublic | null;
+  }) => void;
 }

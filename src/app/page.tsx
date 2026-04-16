@@ -12,7 +12,12 @@ import ThreadPanel from "@/components/ThreadPanel";
 import FeedFilters from "@/components/FeedFilters";
 import NewMessagesPill from "@/components/NewMessagesPill";
 import AnonIdentityButton from "@/components/AnonIdentityButton";
-import type { PostWithMeta, FeedFilters as FeedFiltersType } from "@/types";
+import { getOrCreateAnonIdClient, getAnonAvatarClient } from "@/lib/anonIdentity";
+import type {
+  PostWithMeta,
+  FeedFilters as FeedFiltersType,
+  PresenceEntry,
+} from "@/types";
 
 const MapPanel = dynamic(() => import("@/components/MapPanel"), {
   ssr: false,
@@ -23,22 +28,37 @@ const MapPanel = dynamic(() => import("@/components/MapPanel"), {
   ),
 });
 
-function useSocket(userId: string | null, lat: number, lon: number) {
+interface JoinIdentity {
+  userId?: string;
+  user?: {
+    id: string;
+    username: string;
+    displayName: string | null;
+    profileImg: string | null;
+  } | null;
+  anonId?: string | null;
+  anonAvatar?: string | null;
+}
+
+function useSocket(identity: JoinIdentity, lat: number, lon: number) {
   const [socket, setSocket] = useState<Socket | null>(null);
+  // Stable serialization avoids reconnecting when object identity changes
+  const key = JSON.stringify({ identity, lat, lon });
 
   useEffect(() => {
     const s = io();
     setSocket(s);
 
     s.on("connect", () => {
-      s.emit("join", { userId, lat, lon });
+      s.emit("join", { ...identity, lat, lon });
     });
 
     return () => {
       s.disconnect();
       setSocket(null);
     };
-  }, [userId, lat, lon]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   return socket;
 }
@@ -66,6 +86,11 @@ function FeedContent() {
   const [threadPostId, setThreadPostId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
+  const [presence, setPresence] = useState<PresenceEntry[]>([]);
+  const [anonIdentity, setAnonIdentity] = useState<{
+    anonId: string;
+    anonAvatar: string | null;
+  }>({ anonId: "", anonAvatar: null });
 
   // Map location
   const [mapLat, setMapLat] = useState(lat);
@@ -77,7 +102,41 @@ function FeedContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const socket = useSocket(user?.id ?? null, lat, lon);
+  // Resolve the browser's anon identity once on mount, keep it in sync with
+  // localStorage changes so the presence entry updates when the avatar changes.
+  useEffect(() => {
+    const sync = () => {
+      setAnonIdentity({
+        anonId: getOrCreateAnonIdClient(),
+        anonAvatar: getAnonAvatarClient(),
+      });
+    };
+    sync();
+    window.addEventListener("cf-anon-avatar-changed", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("cf-anon-avatar-changed", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  const socket = useSocket(
+    user
+      ? { userId: user.id, user }
+      : { anonId: anonIdentity.anonId, anonAvatar: anonIdentity.anonAvatar },
+    lat,
+    lon
+  );
+
+  // Push identity updates (e.g. avatar change) without reconnecting
+  useEffect(() => {
+    if (!socket) return;
+    if (user) {
+      socket.emit("update-identity", { user });
+    } else {
+      socket.emit("update-identity", { anonAvatar: anonIdentity.anonAvatar });
+    }
+  }, [socket, user, anonIdentity.anonAvatar]);
 
   // Fetch current user
   useEffect(() => {
@@ -246,11 +305,16 @@ function FeedContent() {
       );
     };
 
+    const handlePresence = (entries: PresenceEntry[]) => {
+      setPresence(entries);
+    };
+
     socket.on("new-post", handleNewPost);
     socket.on("favorite-update", handleFavoriteUpdate);
     socket.on("downvote-update", handleDownvoteUpdate);
     socket.on("new-comment", handleNewComment);
     socket.on("reaction-update", handleReactionUpdate);
+    socket.on("presence", handlePresence);
 
     return () => {
       socket.off("new-post", handleNewPost);
@@ -258,6 +322,7 @@ function FeedContent() {
       socket.off("downvote-update", handleDownvoteUpdate);
       socket.off("new-comment", handleNewComment);
       socket.off("reaction-update", handleReactionUpdate);
+      socket.off("presence", handlePresence);
     };
   }, [socket]);
 
@@ -375,6 +440,7 @@ function FeedContent() {
         <div className="hidden lg:flex w-[200px] flex-shrink-0 border-r border-brand-800 bg-brand-900/30 flex-col overflow-y-auto">
           <NearbyUsers
             posts={posts}
+            presence={presence}
             onUserClick={(userId) => router.push(`/profile/${userId}`)}
           />
         </div>
