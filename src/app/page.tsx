@@ -43,7 +43,7 @@ function useSocket(userId: string | null, lat: number, lon: number) {
 }
 
 function FeedContent() {
-  const { lat, lon } = useLocation();
+  const { lat, lon, approximate, city } = useLocation();
   const router = useRouter();
   const [user, setUser] = useState<{
     id: string;
@@ -291,7 +291,11 @@ function FeedContent() {
               <circle cx="12" cy="10" r="3" />
             </svg>
             <span className="hidden sm:inline">
-              {usingMapLocation ? "Custom location" : "Your area"}
+              {usingMapLocation
+                ? "Custom location"
+                : approximate
+                  ? `Near ${city ?? "you"} (approx.)`
+                  : "Your area"}
               {filters.range > 0
                 ? ` \u2022 ${filters.range >= 1609 ? `${(filters.range / 1609).toFixed(1)} mi` : `${Math.round(filters.range)}m`}`
                 : " \u2022 All posts"}

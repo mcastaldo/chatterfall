@@ -11,6 +11,8 @@ import {
 interface LocationContextValue {
   lat: number;
   lon: number;
+  approximate: boolean;
+  city?: string | null;
 }
 
 const LocationContext = createContext<LocationContextValue | null>(null);
@@ -27,64 +29,95 @@ interface LocationGateProps {
   children: ReactNode;
 }
 
+type Status =
+  | { kind: "loading" }
+  | { kind: "ok"; location: LocationContextValue }
+  | { kind: "error"; message: string };
+
 export function LocationGate({ children }: LocationGateProps) {
-  const [location, setLocation] = useState<LocationContextValue | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<Status>({ kind: "loading" });
 
   useEffect(() => {
+    let cancelled = false;
+
+    const fallbackToIp = async (reason: string) => {
+      try {
+        const res = await fetch("/api/iplocation");
+        if (!res.ok) throw new Error("ip lookup failed");
+        const data = await res.json();
+        if (cancelled) return;
+        setStatus({
+          kind: "ok",
+          location: {
+            lat: data.lat,
+            lon: data.lon,
+            approximate: true,
+            city: data.city,
+          },
+        });
+      } catch {
+        if (cancelled) return;
+        setStatus({
+          kind: "error",
+          message: reason,
+        });
+      }
+    };
+
     if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
-      setLoading(false);
+      fallbackToIp(
+        "Geolocation is not supported by your browser, and we couldn't determine your location from your IP."
+      );
       return;
     }
 
-    // Initial position
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-        setLoading(false);
+        if (cancelled) return;
+        setStatus({
+          kind: "ok",
+          location: {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            approximate: false,
+          },
+        });
       },
-      (err) => {
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            setError(
-              "Location permission denied. Chatterfall needs your location to show nearby posts. Please enable location access in your browser settings."
-            );
-            break;
-          case err.POSITION_UNAVAILABLE:
-            setError(
-              "Location unavailable. Please check your device settings and try again."
-            );
-            break;
-          case err.TIMEOUT:
-            setError(
-              "Location request timed out. Please refresh the page and try again."
-            );
-            break;
-          default:
-            setError("An unknown error occurred while getting your location.");
-        }
-        setLoading(false);
+      () => {
+        // Any error (denied, unavailable, timeout) — fall back to IP
+        fallbackToIp(
+          "We couldn't determine your location. Please enable location in your browser, or try again later."
+        );
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
     );
 
-    // Watch for updates every 5 minutes via watchPosition
+    // Keep watching for GPS updates in case permission is granted later
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        if (cancelled) return;
+        setStatus({
+          kind: "ok",
+          location: {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            approximate: false,
+          },
+        });
       },
       () => {
-        // silently ignore watch errors if we already have a position
+        // silently ignore watch errors
       },
       { enableHighAccuracy: false, maximumAge: 300000 }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      cancelled = true;
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, []);
 
-  if (loading) {
+  if (status.kind === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-brand-950">
         <div className="flex flex-col items-center gap-4 text-center px-6">
@@ -102,7 +135,7 @@ export function LocationGate({ children }: LocationGateProps) {
     );
   }
 
-  if (error) {
+  if (status.kind === "error") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-brand-950">
         <div className="mx-auto max-w-md rounded-xl border border-brand-800/50 bg-brand-900/50 backdrop-blur p-6 text-center">
@@ -119,9 +152,9 @@ export function LocationGate({ children }: LocationGateProps) {
             <circle cx="12" cy="10" r="3" />
           </svg>
           <h2 className="text-lg font-semibold text-white mb-2">
-            Location Required
+            Location Unavailable
           </h2>
-          <p className="text-sm text-gray-300">{error}</p>
+          <p className="text-sm text-gray-300">{status.message}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-400 transition-colors"
@@ -134,7 +167,7 @@ export function LocationGate({ children }: LocationGateProps) {
   }
 
   return (
-    <LocationContext.Provider value={location!}>
+    <LocationContext.Provider value={status.location}>
       {children}
     </LocationContext.Provider>
   );
