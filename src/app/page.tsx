@@ -12,6 +12,7 @@ import ThreadPanel from "@/components/ThreadPanel";
 import FeedFilters from "@/components/FeedFilters";
 import NewMessagesPill from "@/components/NewMessagesPill";
 import AnonIdentityButton from "@/components/AnonIdentityButton";
+import Logo from "@/components/Logo";
 import { getOrCreateAnonIdClient, getAnonAvatarClient } from "@/lib/anonIdentity";
 import type {
   PostWithMeta,
@@ -347,9 +348,12 @@ function FeedContent() {
       {/* Top bar */}
       <div className="flex-shrink-0 border-b border-brand-800 bg-brand-950/95 backdrop-blur-md">
         <div className="flex items-center h-12 px-4">
-          <span className="text-lg font-bold text-white tracking-tight mr-4">
-            Chatterfall
-          </span>
+          <div className="flex items-center gap-2 mr-4">
+            <Logo className="text-white" size={26} />
+            <span className="text-lg font-bold text-white tracking-tight">
+              Chatterfall
+            </span>
+          </div>
 
           <div className="flex items-center gap-2 text-sm text-gray-400 mr-auto">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
