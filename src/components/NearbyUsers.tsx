@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import UserAvatar from "@/components/UserAvatar";
+import { getAnonIdentity } from "@/lib/anonIdentity";
 import type { PostWithMeta } from "@/types";
 
 interface NearbyUsersProps {
@@ -9,17 +10,42 @@ interface NearbyUsersProps {
   onUserClick: (userId: string) => void;
 }
 
+interface AnonUser {
+  anonId: string;
+  anonAvatar: string | null;
+  name: string;
+  color: string;
+  initial: string;
+}
+
 export default function NearbyUsers({ posts, onUserClick }: NearbyUsersProps) {
-  const { users, anonymousCount } = useMemo(() => {
+  const { users, anonUsers, legacyAnonCount } = useMemo(() => {
     const seen = new Map<
       string,
       { id: string; username: string; displayName: string | null; profileImg: string | null }
     >();
-    let anonCount = 0;
+    const anonSeen = new Map<string, AnonUser>();
+    let legacy = 0;
 
     for (const post of posts) {
       if (post.anonymous || !post.author) {
-        anonCount++;
+        if (post.anonId) {
+          if (!anonSeen.has(post.anonId)) {
+            const id = getAnonIdentity(post.anonId);
+            anonSeen.set(post.anonId, {
+              anonId: post.anonId,
+              anonAvatar: post.anonAvatar ?? null,
+              name: id.name,
+              color: id.color,
+              initial: id.initial,
+            });
+          } else if (post.anonAvatar && !anonSeen.get(post.anonId)!.anonAvatar) {
+            // Keep latest avatar if present
+            anonSeen.get(post.anonId)!.anonAvatar = post.anonAvatar;
+          }
+        } else {
+          legacy++;
+        }
       } else {
         if (!seen.has(post.author.id)) {
           seen.set(post.author.id, post.author);
@@ -27,10 +53,14 @@ export default function NearbyUsers({ posts, onUserClick }: NearbyUsersProps) {
       }
     }
 
-    return { users: Array.from(seen.values()), anonymousCount: anonCount };
+    return {
+      users: Array.from(seen.values()),
+      anonUsers: Array.from(anonSeen.values()),
+      legacyAnonCount: legacy,
+    };
   }, [posts]);
 
-  const totalCount = users.length + (anonymousCount > 0 ? 1 : 0);
+  const totalCount = users.length + anonUsers.length + (legacyAnonCount > 0 ? 1 : 0);
 
   return (
     <div className="w-[200px] flex-shrink-0 bg-brand-900/50 border-r border-brand-800 flex flex-col h-full">
@@ -46,7 +76,7 @@ export default function NearbyUsers({ posts, onUserClick }: NearbyUsersProps) {
 
       {/* User list */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-        {users.length === 0 && anonymousCount === 0 ? (
+        {users.length === 0 && anonUsers.length === 0 && legacyAnonCount === 0 ? (
           <p className="text-xs text-gray-500 px-2 py-4 text-center">
             No one nearby yet
           </p>
@@ -68,8 +98,37 @@ export default function NearbyUsers({ posts, onUserClick }: NearbyUsersProps) {
               </button>
             ))}
 
-            {/* Anonymous entry */}
-            {anonymousCount > 0 && (
+            {/* Individual anonymous users */}
+            {anonUsers.map((anon) => (
+              <div
+                key={anon.anonId}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-brand-800/50 transition-colors"
+              >
+                <div className="relative flex-shrink-0">
+                  {anon.anonAvatar ? (
+                    <img
+                      src={anon.anonAvatar}
+                      alt={anon.name}
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                      style={{ backgroundColor: anon.color }}
+                    >
+                      {anon.initial}
+                    </div>
+                  )}
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-gray-500 border-2 border-brand-900" />
+                </div>
+                <span className="text-sm text-gray-400 italic truncate">
+                  {anon.name}
+                </span>
+              </div>
+            ))}
+
+            {/* Legacy (no anonId) fallback bucket */}
+            {legacyAnonCount > 0 && (
               <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
                 <div className="relative flex-shrink-0">
                   <div className="w-7 h-7 rounded-full bg-brand-800 flex items-center justify-center text-gray-500 text-xs font-bold">
@@ -80,7 +139,7 @@ export default function NearbyUsers({ posts, onUserClick }: NearbyUsersProps) {
                   Anonymous
                 </span>
                 <span className="ml-auto text-[10px] text-gray-600">
-                  {anonymousCount}
+                  {legacyAnonCount}
                 </span>
               </div>
             )}

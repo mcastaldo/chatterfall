@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 import UserAvatar from "@/components/UserAvatar";
 import type { PostWithMeta, CommentWithMeta } from "@/types";
+import { getAnonIdentity, getOrCreateAnonIdClient, getAnonAvatarClient } from "@/lib/anonIdentity";
 
 interface ThreadPanelProps {
   postId: string;
@@ -61,11 +62,13 @@ export default function ThreadPanel({
     if (!trimmed || submitting) return;
 
     setSubmitting(true);
+    const anonId = anonymous ? getOrCreateAnonIdClient() : null;
+    const anonAvatar = anonymous ? getAnonAvatarClient() : null;
     try {
       const res = await fetch(`/api/posts/${postId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: trimmed, anonymous, lat, lon }),
+        body: JSON.stringify({ content: trimmed, anonymous, anonId, anonAvatar, lat, lon }),
       });
       if (res.ok) {
         setContent("");
@@ -121,9 +124,29 @@ export default function ThreadPanel({
           <div className="flex gap-3">
             <div className="flex-shrink-0">
               {isAnonymous(post.author, post.anonymous) ? (
-                <div className="w-10 h-10 rounded-full bg-brand-800 flex items-center justify-center text-gray-500 text-lg font-bold">
-                  ?
-                </div>
+                post.anonId ? (
+                  (() => {
+                    const id = getAnonIdentity(post.anonId);
+                    return post.anonAvatar ? (
+                      <img
+                        src={post.anonAvatar}
+                        alt={id.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                        style={{ backgroundColor: id.color }}
+                      >
+                        {id.initial}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-brand-800 flex items-center justify-center text-gray-500 text-lg font-bold">
+                    ?
+                  </div>
+                )
               ) : (
                 <UserAvatar user={post.author} size="md" />
               )}
@@ -131,7 +154,9 @@ export default function ThreadPanel({
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2">
                 {isAnonymous(post.author, post.anonymous) ? (
-                  <span className="text-gray-500 italic text-sm">Anonymous</span>
+                  <span className="text-gray-400 italic text-sm">
+                    {post.anonId ? getAnonIdentity(post.anonId).name : "Anonymous"}
+                  </span>
                 ) : (
                   <span className="font-semibold text-white text-sm">
                     {post.author?.displayName || post.author?.username}
@@ -183,9 +208,29 @@ export default function ThreadPanel({
             >
               <div className="flex-shrink-0 mt-0.5">
                 {isAnonymous(comment.author, comment.anonymous) ? (
-                  <div className="w-7 h-7 rounded-full bg-brand-800 flex items-center justify-center text-gray-500 text-xs font-bold">
-                    ?
-                  </div>
+                  comment.anonId ? (
+                    (() => {
+                      const id = getAnonIdentity(comment.anonId);
+                      return comment.anonAvatar ? (
+                        <img
+                          src={comment.anonAvatar}
+                          alt={id.name}
+                          className="w-7 h-7 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                          style={{ backgroundColor: id.color }}
+                        >
+                          {id.initial}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-brand-800 flex items-center justify-center text-gray-500 text-xs font-bold">
+                      ?
+                    </div>
+                  )
                 ) : (
                   <UserAvatar user={comment.author} size="sm" />
                 )}
@@ -193,7 +238,9 @@ export default function ThreadPanel({
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
                   {isAnonymous(comment.author, comment.anonymous) ? (
-                    <span className="text-gray-500 italic text-xs">Anonymous</span>
+                    <span className="text-gray-400 italic text-xs">
+                      {comment.anonId ? getAnonIdentity(comment.anonId).name : "Anonymous"}
+                    </span>
                   ) : (
                     <span className="font-semibold text-white text-xs">
                       {comment.author?.displayName || comment.author?.username}

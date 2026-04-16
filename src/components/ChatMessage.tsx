@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import UserAvatar from "@/components/UserAvatar";
 import EmojiReactions from "@/components/EmojiReactions";
 import { formatCount } from "@/lib/utils";
+import { getAnonIdentity } from "@/lib/anonIdentity";
 import type { PostWithMeta } from "@/types";
 
 interface ChatMessageProps {
@@ -58,6 +59,7 @@ export default function ChatMessage({
   };
 
   const isAnonymous = post.anonymous || !post.author;
+  const anonIdentity = isAnonymous && post.anonId ? getAnonIdentity(post.anonId) : null;
   const timestamp = formatDistanceToNow(new Date(post.createdAt), {
     addSuffix: true,
   });
@@ -67,9 +69,26 @@ export default function ChatMessage({
       {/* Avatar */}
       <div className="flex-shrink-0 mt-0.5">
         {isAnonymous ? (
-          <div className="w-10 h-10 rounded-full bg-brand-800 flex items-center justify-center text-gray-500 text-lg font-bold">
-            ?
-          </div>
+          anonIdentity ? (
+            post.anonAvatar ? (
+              <img
+                src={post.anonAvatar}
+                alt={anonIdentity.name}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                style={{ backgroundColor: anonIdentity.color }}
+              >
+                {anonIdentity.initial}
+              </div>
+            )
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-brand-800 flex items-center justify-center text-gray-500 text-lg font-bold">
+              ?
+            </div>
+          )
         ) : (
           <UserAvatar user={post.author} size="md" />
         )}
@@ -80,7 +99,9 @@ export default function ChatMessage({
         {/* Author + Timestamp + Location + Distance */}
         <div className="flex items-baseline gap-2 flex-wrap">
           {isAnonymous ? (
-            <span className="text-gray-500 italic text-sm">Anonymous</span>
+            <span className="text-gray-400 italic text-sm">
+              {anonIdentity ? anonIdentity.name : "Anonymous"}
+            </span>
           ) : (
             <span className="font-semibold text-white text-sm">
               {post.author?.displayName || post.author?.username}

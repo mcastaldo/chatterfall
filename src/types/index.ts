@@ -12,6 +12,8 @@ export interface PostWithMeta {
   lat: number;
   lon: number;
   anonymous: boolean;
+  anonId?: string | null;
+  anonAvatar?: string | null;
   createdAt: string;
   author: UserPublic | null;
   _count: {
@@ -31,6 +33,8 @@ export interface CommentWithMeta {
   content: string;
   imageUrl: string | null;
   anonymous: boolean;
+  anonId?: string | null;
+  anonAvatar?: string | null;
   createdAt: string;
   author: UserPublic | null;
   postId: string;

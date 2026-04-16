@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import UserAvatar from "@/components/UserAvatar";
@@ -19,6 +19,9 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch current user
   useEffect(() => {
@@ -56,6 +59,76 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAvatarError(null);
+
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError("Image must be under 2MB");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        throw new Error(err.error || "Upload failed");
+      }
+      const { url } = await uploadRes.json();
+
+      const patchRes = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileImg: url }),
+      });
+      if (!patchRes.ok) {
+        const err = await patchRes.json().catch(() => ({}));
+        throw new Error(err.error || "Could not save profile");
+      }
+      const updated = await patchRes.json();
+
+      // Update both local state objects
+      setCurrentUser((prev) =>
+        prev ? { ...prev, profileImg: updated.profileImg } : prev
+      );
+      setProfile((prev) =>
+        prev ? { ...prev, profileImg: updated.profileImg } : prev
+      );
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setAvatarError(null);
+    setUploadingAvatar(true);
+    try {
+      const res = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileImg: null }),
+      });
+      if (!res.ok) throw new Error("Could not remove profile picture");
+      setCurrentUser((prev) => (prev ? { ...prev, profileImg: null } : prev));
+      setProfile((prev) => (prev ? { ...prev, profileImg: null } : prev));
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : "Remove failed");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const isOwnProfile = currentUser?.id === userId;
 
   if (loading) {
@@ -90,7 +163,54 @@ export default function ProfilePage() {
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="card text-center space-y-6">
           <div className="flex flex-col items-center gap-4">
-            <UserAvatar user={profile} size="lg" />
+            <div className="relative">
+              <UserAvatar user={profile} size="lg" />
+              {isOwnProfile && (
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-brand-500 hover:bg-brand-400 text-white flex items-center justify-center border-2 border-brand-950 transition-colors disabled:opacity-60"
+                  title="Change profile picture"
+                >
+                  {uploadingAvatar ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="w-4 h-4"
+                    >
+                      <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 1H8.828a2 2 0 00-1.414.586L6.293 2.707A1 1 0 015.586 3H4zm6 11a4 4 0 100-8 4 4 0 000 8z" />
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
+            {isOwnProfile && (
+              <>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+                {profile.profileImg && !uploadingAvatar && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    className="text-xs text-gray-400 hover:text-red-400 transition-colors"
+                  >
+                    Remove picture
+                  </button>
+                )}
+                {avatarError && (
+                  <p className="text-xs text-red-400">{avatarError}</p>
+                )}
+              </>
+            )}
             <div>
               <h1 className="text-2xl font-bold text-white">
                 {profile.displayName || profile.username}

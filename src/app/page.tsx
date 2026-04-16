@@ -11,6 +11,7 @@ import NearbyUsers from "@/components/NearbyUsers";
 import ThreadPanel from "@/components/ThreadPanel";
 import FeedFilters from "@/components/FeedFilters";
 import NewMessagesPill from "@/components/NewMessagesPill";
+import AnonIdentityButton from "@/components/AnonIdentityButton";
 import type { PostWithMeta, FeedFilters as FeedFiltersType } from "@/types";
 
 const MapPanel = dynamic(() => import("@/components/MapPanel"), {
@@ -348,12 +349,15 @@ function FeedContent() {
                 </div>
               </button>
             ) : (
-              <button
-                onClick={() => router.push("/login")}
-                className="text-sm text-brand-400 hover:text-brand-300 px-2 py-1 ml-1"
-              >
-                Login
-              </button>
+              <>
+                <AnonIdentityButton />
+                <button
+                  onClick={() => router.push("/login")}
+                  className="text-sm text-brand-400 hover:text-brand-300 px-2 py-1 ml-1"
+                >
+                  Login
+                </button>
+              </>
             )}
           </div>
         </div>

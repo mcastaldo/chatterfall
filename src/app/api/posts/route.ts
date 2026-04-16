@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     const body = await req.json();
-    const { content, imageUrl, lat, lon, anonymous } = body;
+    const { content, imageUrl, lat, lon, anonymous, anonId, anonAvatar } = body;
 
     if (!anonymous && !session) {
       return NextResponse.json(
@@ -168,6 +168,11 @@ export async function POST(req: NextRequest) {
         lat,
         lon,
         anonymous: !!anonymous,
+        anonId: anonymous && typeof anonId === "string" ? anonId.slice(0, 64) : null,
+        anonAvatar:
+          anonymous && typeof anonAvatar === "string" && anonAvatar.length < 2_000_000
+            ? anonAvatar
+            : null,
         locationName,
         ...(session && !anonymous ? { authorId: session.userId } : {}),
       },

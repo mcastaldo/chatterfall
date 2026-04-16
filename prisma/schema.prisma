@@ -39,6 +39,8 @@ model Post {
   lat          Float
   lon          Float
   anonymous    Boolean  @default(false)
+  anonId       String?
+  anonAvatar   String?
   locationName String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -63,8 +65,10 @@ model Comment {
   imageUrl  String?
   lat       Float
   lon       Float
-  anonymous Boolean  @default(false)
-  createdAt DateTime @default(now())
+  anonymous  Boolean  @default(false)
+  anonId     String?
+  anonAvatar String?
+  createdAt  DateTime @default(now())
 
   authorId String?
   author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)

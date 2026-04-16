@@ -76,7 +76,7 @@ export async function POST(
     const session = await getSession();
     const { postId } = await params;
     const body = await req.json();
-    const { content, imageUrl, lat, lon, anonymous } = body;
+    const { content, imageUrl, lat, lon, anonymous, anonId, anonAvatar } = body;
 
     if (!anonymous && !session) {
       return NextResponse.json(
@@ -108,6 +108,11 @@ export async function POST(
         lat,
         lon,
         anonymous: !!anonymous,
+        anonId: anonymous && typeof anonId === "string" ? anonId.slice(0, 64) : null,
+        anonAvatar:
+          anonymous && typeof anonAvatar === "string" && anonAvatar.length < 2_000_000
+            ? anonAvatar
+            : null,
         postId,
         ...(session && !anonymous ? { authorId: session.userId } : {}),
       },

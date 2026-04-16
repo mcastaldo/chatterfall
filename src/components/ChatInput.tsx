@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { getOrCreateAnonIdClient, getAnonAvatarClient } from "@/lib/anonIdentity";
 
 interface ChatInputProps {
   lat: number;
@@ -69,6 +70,10 @@ export default function ChatInput({
 
     setSubmitting(true);
 
+    // Get stable anonId + avatar for this browser (only used when posting anonymously)
+    const anonId = anonymous ? getOrCreateAnonIdClient() : null;
+    const anonAvatar = anonymous ? getAnonAvatarClient() : null;
+
     // Optimistic: show post immediately
     const optimisticPost = {
       id: `optimistic-${Date.now()}`,
@@ -77,6 +82,8 @@ export default function ChatInput({
       lat,
       lon,
       anonymous,
+      anonId,
+      anonAvatar,
       createdAt: new Date().toISOString(),
       author: anonymous ? null : user ?? null,
       _count: { comments: 0, favorites: 0, downvotes: 0 },
@@ -119,6 +126,8 @@ export default function ChatInput({
         body: JSON.stringify({
           content: trimmed,
           anonymous,
+          anonId,
+          anonAvatar,
           lat,
           lon,
           imageUrl,
