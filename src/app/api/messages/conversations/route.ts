@@ -1,24 +1,28 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import {
+  getSenderIdentity,
+  toTarget,
+  getPartner,
+  whereIdentity,
+  type MsgIdentity,
+} from "@/lib/messagingIdentity";
+import { getAnonIdentity } from "@/lib/anonIdentity";
 
 export async function GET() {
   try {
-    const session = await getSession();
-
-    if (!session) {
+    const me = await getSenderIdentity();
+    if (!me) {
       return NextResponse.json(
-        { error: "Authentication required" },
+        { error: "Identity required" },
         { status: 401 }
       );
     }
 
+    // All DMs involving me on either side
     const messages = await prisma.directMessage.findMany({
       where: {
-        OR: [
-          { senderId: session.userId },
-          { receiverId: session.userId },
-        ],
+        OR: [whereIdentity(me, "sender"), whereIdentity(me, "receiver")],
       },
       orderBy: { createdAt: "desc" },
       include: {
@@ -41,43 +45,107 @@ export async function GET() {
       },
     });
 
-    const conversationMap = new Map<
+    // De-duplicate by partner
+    const seen = new Map<
       string,
       {
-        user: { id: string; username: string; displayName: string | null; profileImg: string | null };
-        lastMessage: { content: string; createdAt: Date; senderId: string };
-        unreadCount: number;
+        partner: MsgIdentity;
+        lastMessage: {
+          content: string;
+          createdAt: Date;
+          senderTarget: string;
+        };
       }
     >();
 
     for (const msg of messages) {
-      const partnerId =
-        msg.senderId === session.userId ? msg.receiverId : msg.senderId;
-      const partner =
-        msg.senderId === session.userId ? msg.receiver : msg.sender;
+      const partner = getPartner(msg, me);
+      if (!partner) continue;
+      const key = toTarget(partner);
 
-      if (!conversationMap.has(partnerId)) {
-        const unreadCount = await prisma.directMessage.count({
-          where: {
-            senderId: partnerId,
-            receiverId: session.userId,
-            read: false,
-          },
-        });
+      if (!seen.has(key)) {
+        const sTarget = msg.senderId
+          ? `u-${msg.senderId}`
+          : msg.senderAnonId
+            ? `a-${msg.senderAnonId}`
+            : toTarget(me);
 
-        conversationMap.set(partnerId, {
-          user: partner,
+        seen.set(key, {
+          partner,
           lastMessage: {
             content: msg.content,
             createdAt: msg.createdAt,
-            senderId: msg.senderId,
+            senderTarget: sTarget,
           },
-          unreadCount,
         });
       }
     }
 
-    const conversations = Array.from(conversationMap.values());
+    // Build conversation list with unread counts + partner display info
+    const conversations = await Promise.all(
+      Array.from(seen.entries()).map(async ([key, { partner, lastMessage }]) => {
+        // Count unread messages from this partner to me
+        const unreadCount = await prisma.directMessage.count({
+          where: {
+            ...whereIdentity(partner, "sender"),
+            ...whereIdentity(me, "receiver"),
+            read: false,
+          },
+        });
+
+        // Resolve partner display info
+        let partnerDisplay: {
+          kind: "user" | "anon";
+          id: string;
+          target: string;
+          name: string;
+          username?: string;
+          profileImg?: string | null;
+          anonAvatar?: string | null;
+        };
+
+        if (partner.kind === "user") {
+          const user = await prisma.user.findUnique({
+            where: { id: partner.id },
+            select: { id: true, username: true, displayName: true, profileImg: true },
+          });
+          partnerDisplay = {
+            kind: "user",
+            id: partner.id,
+            target: key,
+            name: user?.displayName || user?.username || "Unknown",
+            username: user?.username,
+            profileImg: user?.profileImg ?? null,
+          };
+        } else {
+          const identity = getAnonIdentity(partner.id);
+          // Try to find a recent avatar from a post/comment by this anonId
+          const recentPost = await prisma.post.findFirst({
+            where: { anonId: partner.id, anonAvatar: { not: null } },
+            select: { anonAvatar: true },
+            orderBy: { createdAt: "desc" },
+          });
+
+          partnerDisplay = {
+            kind: "anon",
+            id: partner.id,
+            target: key,
+            name: identity.name,
+            anonAvatar: recentPost?.anonAvatar ?? null,
+          };
+        }
+
+        return {
+          partner: partnerDisplay,
+          lastMessage: {
+            content: lastMessage.content,
+            createdAt: lastMessage.createdAt.toISOString(),
+            senderTarget: lastMessage.senderTarget,
+          },
+          unreadCount,
+        };
+      })
+    );
 
     return NextResponse.json(conversations);
   } catch (error) {

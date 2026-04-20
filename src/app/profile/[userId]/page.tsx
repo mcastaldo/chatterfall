@@ -258,9 +258,9 @@ export default function ProfilePage() {
             </button>
           )}
 
-          {!isOwnProfile && currentUser && (
+          {!isOwnProfile && (
             <button
-              onClick={() => router.push(`/messages/${userId}`)}
+              onClick={() => router.push(`/messages/u-${userId}`)}
               className="btn-primary"
             >
               Send Message

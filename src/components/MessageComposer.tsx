@@ -3,12 +3,12 @@
 import { useState } from "react";
 
 interface MessageComposerProps {
-  recipientId: string;
+  recipientTarget: string;
   onSend?: () => void;
 }
 
 export default function MessageComposer({
-  recipientId,
+  recipientTarget,
   onSend,
 }: MessageComposerProps) {
   const [content, setContent] = useState("");
@@ -22,7 +22,7 @@ export default function MessageComposer({
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/messages/${recipientId}`, {
+      const res = await fetch(`/api/messages/${recipientTarget}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: content.trim() }),

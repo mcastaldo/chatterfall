@@ -156,12 +156,19 @@ model DirectMessage {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  senderId   String
-  sender     User   @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiverId String
-  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  // Exactly one of senderId / senderAnonId must be set (likewise for receiver).
+  senderId     String?
+  sender       User?   @relation("SentMessages", fields: [senderId], references: [id], onDelete: SetNull)
+  senderAnonId String?
+
+  receiverId     String?
+  receiver       User?   @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: SetNull)
+  receiverAnonId String?
 
   @@index([senderId, receiverId])
+  @@index([senderAnonId, receiverAnonId])
+  @@index([senderId, receiverAnonId])
+  @@index([senderAnonId, receiverId])
   @@index([createdAt])
   @@map("direct_messages")
 }

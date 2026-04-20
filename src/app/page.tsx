@@ -446,6 +446,7 @@ function FeedContent() {
             posts={posts}
             presence={presence}
             onUserClick={(userId) => router.push(`/profile/${userId}`)}
+            onDm={(target) => router.push(`/messages/${target}`)}
           />
         </div>
 
@@ -476,6 +477,7 @@ function FeedContent() {
                   post={post}
                   currentUserId={user?.id}
                   onThreadOpen={(id) => setThreadPostId(id)}
+                  onDm={(target) => router.push(`/messages/${target}`)}
                 />
               ))}
               <div ref={messagesEndRef} />

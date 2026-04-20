@@ -2,6 +2,7 @@ import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server } from "socket.io";
+import { runBotTick, nextBotInterval } from "./src/lib/botRunner";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT || "3000", 10);
@@ -82,8 +83,8 @@ app.prepare().then(() => {
       });
       req.on("end", () => {
         try {
-          const { event, data, targetUserIds } = JSON.parse(body);
-          handleBroadcast(event, data, targetUserIds);
+          const { event, data, targetUserIds, targetIdentities } = JSON.parse(body);
+          handleBroadcast(event, data, targetUserIds, targetIdentities);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch {
@@ -134,6 +135,11 @@ app.prepare().then(() => {
           lat: data.lat,
           lon: data.lon,
         });
+
+        // Join identity-based rooms so DMs can be routed
+        if (data.userId) socket.join(`u-${data.userId}`);
+        if (data.anonId) socket.join(`a-${data.anonId}`);
+
         // Send current presence to the new client immediately,
         // then broadcast to everyone else so they see the new arrival.
         socket.emit("presence", buildPresenceList());
@@ -180,9 +186,15 @@ app.prepare().then(() => {
   function handleBroadcast(
     event: string,
     data: unknown,
-    targetUserIds?: string[]
+    targetUserIds?: string[],
+    targetIdentities?: string[]
   ) {
-    if (targetUserIds && targetUserIds.length > 0) {
+    if (targetIdentities && targetIdentities.length > 0) {
+      // targetIdentities are room names like "u-xxx" or "a-xxx"
+      for (const room of targetIdentities) {
+        io.to(room).emit(event, data as never);
+      }
+    } else if (targetUserIds && targetUserIds.length > 0) {
       const socketIds = getSocketIdsByUserIds(targetUserIds);
       for (const socketId of socketIds) {
         io.to(socketId).emit(event, data as never);
@@ -192,8 +204,24 @@ app.prepare().then(() => {
     }
   }
 
+  // Bot posting loop — fires every 4–11 min during 7am–11pm
+  function scheduleBotTick() {
+    const delay = nextBotInterval();
+    setTimeout(async () => {
+      const post = await runBotTick();
+      if (post) {
+        io.emit("new-post", post);
+      }
+      scheduleBotTick(); // reschedule
+    }, delay);
+  }
+
+  // Kick off after 30s so the server is fully warmed up first
+  setTimeout(scheduleBotTick, 30_000);
+
   httpServer.listen(port, () => {
     console.log(`> Chatterfall running on http://localhost:${port}`);
     console.log(`> Socket.IO attached on same port`);
+    console.log(`> Bot runner will start in 30s`);
   });
 });

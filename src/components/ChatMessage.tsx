@@ -12,12 +12,14 @@ interface ChatMessageProps {
   post: PostWithMeta;
   currentUserId?: string;
   onThreadOpen: (postId: string) => void;
+  onDm?: (target: string) => void;
 }
 
 export default function ChatMessage({
   post,
   currentUserId,
   onThreadOpen,
+  onDm,
 }: ChatMessageProps) {
   const [favorited, setFavorited] = useState(post.favorited ?? false);
   const [favCount, setFavCount] = useState(post._count.favorites);
@@ -99,12 +101,22 @@ export default function ChatMessage({
         {/* Author + Timestamp + Location + Distance */}
         <div className="flex items-baseline gap-2 flex-wrap">
           {isAnonymous ? (
-            <span className="text-gray-400 italic text-sm">
+            <span
+              className={`text-gray-400 italic text-sm ${onDm && post.anonId ? "cursor-pointer hover:text-gray-200 transition-colors" : ""}`}
+              onClick={() => {
+                if (onDm && post.anonId) onDm(`a-${post.anonId}`);
+              }}
+            >
               {anonIdentity ? anonIdentity.name : "Anonymous"}
             </span>
           ) : (
             <span className="flex items-center gap-1">
-              <span className="font-semibold text-white text-sm">
+              <span
+                className={`font-semibold text-white text-sm ${onDm && post.author ? "cursor-pointer hover:text-brand-300 transition-colors" : ""}`}
+                onClick={() => {
+                  if (onDm && post.author) onDm(`u-${post.author.id}`);
+                }}
+              >
                 {post.author?.displayName || post.author?.username}
               </span>
               <svg

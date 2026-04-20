@@ -6,16 +6,16 @@ interface MessageBubbleProps {
   message: {
     content: string;
     createdAt: string | Date;
-    senderId: string;
+    senderTarget: string;
   };
-  currentUserId: string;
+  myTarget: string;
 }
 
 export default function MessageBubble({
   message,
-  currentUserId,
+  myTarget,
 }: MessageBubbleProps) {
-  const isSent = message.senderId === currentUserId;
+  const isSent = message.senderTarget === myTarget;
 
   return (
     <div className={`flex ${isSent ? "justify-end" : "justify-start"} mb-3`}>

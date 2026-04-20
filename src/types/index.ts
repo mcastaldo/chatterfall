@@ -46,12 +46,24 @@ export interface CommentWithMeta {
   downvoted?: boolean;
 }
 
+export interface ConversationPartner {
+  kind: "user" | "anon";
+  id: string;
+  target: string; // "u-<id>" or "a-<anonId>"
+  name: string;
+  username?: string;
+  profileImg?: string | null;
+  anonAvatar?: string | null;
+}
+
 export interface ConversationPreview {
-  user: UserPublic;
+  partner: ConversationPartner;
+  // Legacy compat for old code
+  user?: UserPublic;
   lastMessage: {
     content: string;
     createdAt: string;
-    senderId: string;
+    senderTarget: string;
   };
   unreadCount: number;
 }
@@ -61,9 +73,15 @@ export interface MessageData {
   content: string;
   imageUrl: string | null;
   createdAt: string;
-  senderId: string;
-  receiverId: string;
+  senderTarget: string; // "u-<id>" or "a-<anonId>"
   read: boolean;
+  sender?: {
+    name: string;
+    profileImg?: string | null;
+  };
+  // Legacy fields for backwards compat
+  senderId?: string;
+  receiverId?: string;
 }
 
 export interface NotificationData {

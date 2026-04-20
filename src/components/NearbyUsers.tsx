@@ -9,6 +9,7 @@ interface NearbyUsersProps {
   posts: PostWithMeta[];
   presence?: PresenceEntry[];
   onUserClick: (userId: string) => void;
+  onDm?: (target: string) => void;
 }
 
 interface AnonUser {
@@ -32,6 +33,7 @@ export default function NearbyUsers({
   posts,
   presence = [],
   onUserClick,
+  onDm,
 }: NearbyUsersProps) {
   const { users, anonUsers, legacyAnonCount } = useMemo(() => {
     const regMap = new Map<string, RegUser>();
@@ -143,31 +145,46 @@ export default function NearbyUsers({
         ) : (
           <>
             {users.map((user) => (
-              <button
+              <div
                 key={user.id}
-                onClick={() => onUserClick(user.id)}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-brand-800/50 transition-colors text-left group ${
+                className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-brand-800/50 transition-colors group ${
                   user.online ? "" : "opacity-60"
                 }`}
               >
-                <div className="relative flex-shrink-0">
-                  <UserAvatar user={user} size="sm" />
-                  <div
-                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-900 ${
-                      user.online ? "bg-brand-500" : "bg-gray-600"
-                    }`}
-                  />
-                </div>
-                <span className="text-sm text-gray-300 group-hover:text-white truncate transition-colors">
-                  {user.displayName || user.username}
-                </span>
-              </button>
+                <button
+                  onClick={() => onUserClick(user.id)}
+                  className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                >
+                  <div className="relative flex-shrink-0">
+                    <UserAvatar user={user} size="sm" />
+                    <div
+                      className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-900 ${
+                        user.online ? "bg-brand-500" : "bg-gray-600"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-sm text-gray-300 group-hover:text-white truncate transition-colors">
+                    {user.displayName || user.username}
+                  </span>
+                </button>
+                {onDm && (
+                  <button
+                    onClick={() => onDm(`u-${user.id}`)}
+                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-brand-400 p-0.5"
+                    title={`Message ${user.displayName || user.username}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M3.505 2.365A41.369 41.369 0 019 2c1.863 0 3.697.124 5.495.365 1.247.167 2.18 1.249 2.205 2.507a1 1 0 01-.018.186l-.48 2.88a1 1 0 01-.653.745l-1.77.59a1 1 0 00-.634.638l-.58 1.74a1 1 0 01-.665.652l-2.4.72a1 1 0 01-1.14-.48L7.4 10.64a1 1 0 00-.634-.474l-2.39-.598a1 1 0 01-.753-.74l-.48-2.4a1 1 0 01-.018-.186c.026-1.258.958-2.34 2.205-2.507h.175z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             ))}
 
             {anonUsers.map((anon) => (
               <div
                 key={anon.anonId}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-brand-800/50 transition-colors ${
+                className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-brand-800/50 transition-colors group ${
                   anon.online ? "" : "opacity-60"
                 }`}
               >
@@ -192,9 +209,20 @@ export default function NearbyUsers({
                     }`}
                   />
                 </div>
-                <span className="text-sm text-gray-400 italic truncate">
+                <span className="text-sm text-gray-400 italic truncate flex-1">
                   {anon.name}
                 </span>
+                {onDm && (
+                  <button
+                    onClick={() => onDm(`a-${anon.anonId}`)}
+                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-brand-400 p-0.5"
+                    title={`Message ${anon.name}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M3.505 2.365A41.369 41.369 0 019 2c1.863 0 3.697.124 5.495.365 1.247.167 2.18 1.249 2.205 2.507a1 1 0 01-.018.186l-.48 2.88a1 1 0 01-.653.745l-1.77.59a1 1 0 00-.634.638l-.58 1.74a1 1 0 01-.665.652l-2.4.72a1 1 0 01-1.14-.48L7.4 10.64a1 1 0 00-.634-.474l-2.39-.598a1 1 0 01-.753-.74l-.48-2.4a1 1 0 01-.018-.186c.026-1.258.958-2.34 2.205-2.507h.175z" />
+                    </svg>
+                  </button>
+                )}
               </div>
             ))}
 

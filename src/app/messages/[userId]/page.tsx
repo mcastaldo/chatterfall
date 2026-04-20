@@ -1,45 +1,69 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { io, Socket } from "socket.io-client";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import { io, Socket } from "socket.io-client";
 import NavBar from "@/components/NavBar";
 import MessageBubble from "@/components/MessageBubble";
 import MessageComposer from "@/components/MessageComposer";
+import { getAnonIdentity, getOrCreateAnonIdClient, getAnonAvatarClient } from "@/lib/anonIdentity";
 import type { MessageData } from "@/types";
 
 export default function ConversationPage() {
-  const { userId: recipientId } = useParams<{ userId: string }>();
-  const router = useRouter();
+  const { userId: target } = useParams<{ userId: string }>();
   const [user, setUser] = useState<{
     id: string;
     username: string;
     displayName: string;
     profileImg: string | null;
   } | null>(null);
+  const [myTarget, setMyTarget] = useState<string>("");
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [partnerName, setPartnerName] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
 
-  // Auth check
+  // Resolve partner display name from target
+  useEffect(() => {
+    if (target.startsWith("a-")) {
+      const anonId = target.slice(2);
+      setPartnerName(getAnonIdentity(anonId).name);
+    } else if (target.startsWith("u-")) {
+      // Fetch user info
+      const userId = target.slice(2);
+      fetch(`/api/users/${userId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) {
+            setPartnerName(data.displayName || data.username || "User");
+          }
+        })
+        .catch(() => {});
+    }
+  }, [target]);
+
+  // Auth check — don't redirect if not logged in, just use anon
   useEffect(() => {
     fetch("/api/auth/me")
-      .then((res) => {
-        if (!res.ok) {
-          router.push("/login");
-          return null;
-        }
-        return res.json();
-      })
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data) setUser(data);
+        if (data) {
+          setUser(data);
+          setMyTarget(`u-${data.id}`);
+        } else {
+          const anonId = getOrCreateAnonIdClient();
+          setMyTarget(`a-${anonId}`);
+        }
       })
-      .catch(() => router.push("/login"));
-  }, [router]);
+      .catch(() => {
+        const anonId = getOrCreateAnonIdClient();
+        setMyTarget(`a-${anonId}`);
+      });
+  }, []);
 
   // Fetch messages
   const fetchMessages = useCallback(
@@ -47,26 +71,25 @@ export default function ConversationPage() {
       const params = new URLSearchParams();
       if (cursorParam) params.set("cursor", cursorParam);
 
-      const res = await fetch(
-        `/api/messages/${recipientId}?${params.toString()}`
-      );
-      if (!res.ok) return { messages: [], nextCursor: undefined };
+      const res = await fetch(`/api/messages/${target}?${params.toString()}`);
+      if (!res.ok) return { messages: [], nextCursor: undefined, myTarget: "" };
       return res.json();
     },
-    [recipientId]
+    [target]
   );
 
   // Initial load
   useEffect(() => {
-    if (!user) return;
+    if (!myTarget) return;
     setLoading(true);
     fetchMessages().then((data) => {
       setMessages(data.messages ?? []);
       setCursor(data.nextCursor);
       setHasMore(!!data.nextCursor);
+      if (data.myTarget) setMyTarget(data.myTarget);
       setLoading(false);
     });
-  }, [user, fetchMessages]);
+  }, [myTarget, fetchMessages]);
 
   // Load older messages
   const loadMore = useCallback(async () => {
@@ -82,19 +105,26 @@ export default function ConversationPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Socket connection
+  // Socket connection for real-time DMs
   useEffect(() => {
-    if (!user) return;
+    if (!myTarget) return;
 
     const socket = io();
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      socket.emit("join", { userId: user.id });
+      if (user) {
+        socket.emit("join", { userId: user.id, user, lat: 0, lon: 0 });
+      } else {
+        const anonId = getOrCreateAnonIdClient();
+        const anonAvatar = getAnonAvatarClient();
+        socket.emit("join", { anonId, anonAvatar, lat: 0, lon: 0 });
+      }
     });
 
     const handleNewMessage = (message: MessageData) => {
-      if (message.senderId === recipientId) {
+      // Only add if from our conversation partner
+      if (message.senderTarget === target) {
         setMessages((prev) => [...prev, message]);
       }
     };
@@ -106,7 +136,7 @@ export default function ConversationPage() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [user, recipientId]);
+  }, [myTarget, target, user]);
 
   const handleSend = () => {
     fetchMessages().then((data) => {
@@ -115,8 +145,6 @@ export default function ConversationPage() {
       setHasMore(!!data.nextCursor);
     });
   };
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -142,6 +170,9 @@ export default function ConversationPage() {
           </svg>
           Back to conversations
         </Link>
+        {partnerName && (
+          <h2 className="text-white font-semibold mt-2">{partnerName}</h2>
+        )}
       </div>
 
       <main className="max-w-2xl mx-auto w-full px-4 flex-1 flex flex-col min-h-0">
@@ -171,9 +202,9 @@ export default function ConversationPage() {
                   message={{
                     content: msg.content,
                     createdAt: msg.createdAt,
-                    senderId: msg.senderId,
+                    senderTarget: msg.senderTarget,
                   }}
-                  currentUserId={user.id}
+                  myTarget={myTarget}
                 />
               ))
             )}
@@ -182,7 +213,7 @@ export default function ConversationPage() {
         </div>
 
         <div className="py-4">
-          <MessageComposer recipientId={recipientId} onSend={handleSend} />
+          <MessageComposer recipientTarget={target} onSend={handleSend} />
         </div>
       </main>
     </div>
