@@ -7,7 +7,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { BOT_CITIES, BOT_DEFINITIONS, generateBotPost } from "./botData";
+import { BOT_CITIES, BOT_DEFINITIONS, POST_TEMPLATES, getSeason, getTimeOfDay } from "./botData";
 
 const prisma = new PrismaClient();
 
@@ -24,6 +24,36 @@ export function nextBotInterval(): number {
 }
 
 let botUserIds: { id: string; cityKey: string }[] | null = null;
+
+// Track which templates were recently used to prevent repeats.
+// We store the raw template string (before substitution).
+// Keep the last 20 used — with ~100 templates in the pool that's an 80% exclusion window.
+const recentTemplates: string[] = [];
+const RECENT_WINDOW = 20;
+
+function pickFreshTemplate(cityKey: string): { content: string; templateUsed: string } {
+  const city = BOT_CITIES[cityKey];
+  if (!city) return { content: "just a regular day out here", templateUsed: "" };
+
+  const recentSet = new Set(recentTemplates);
+  const available = POST_TEMPLATES.filter((t) => !recentSet.has(t));
+  const pool = available.length >= 5 ? available : POST_TEMPLATES;
+  const template = pool[Math.floor(Math.random() * pool.length)];
+
+  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+  const content = template
+    .replace("{food}", pick(city.foods))
+    .replace("{place}", pick(city.places))
+    .replace("{sport}", pick(city.sports))
+    .replace("{weather}", pick(city.weather))
+    .replace("{vibe}", pick(city.vibes))
+    .replace("{city}", city.city.toLowerCase())
+    .replace("{timeofday}", getTimeOfDay())
+    .replace("{season}", getSeason());
+
+  return { content, templateUsed: template };
+}
 
 async function loadBotIds() {
   if (botUserIds) return botUserIds;
@@ -58,7 +88,11 @@ export async function runBotTick(): Promise<object | null> {
     const cityData = BOT_CITIES[bot.cityKey];
     if (!cityData) return null;
 
-    const content = generateBotPost(bot.cityKey);
+    const { content, templateUsed } = pickFreshTemplate(bot.cityKey);
+
+    // Record this template as recently used
+    recentTemplates.push(templateUsed);
+    if (recentTemplates.length > RECENT_WINDOW) recentTemplates.shift();
 
     // Add a small lat/lon jitter so posts don't all stack on the exact city center
     const latJitter = (Math.random() - 0.5) * 0.08; // ±~5 miles

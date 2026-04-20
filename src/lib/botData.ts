@@ -174,58 +174,125 @@ export const BOT_DEFINITIONS: BotUser[] = [
   { username: "lauraenyc", displayName: "Laura E", email: "laura.e.bot@cf.internal", passwordHash: BOT_PASSWORD_HASH, cityKey: "nyc" },
 ];
 
-// Templates — {food}, {place}, {sport}, {weather}, {vibe}, {city} get substituted
+// Templates — {food}, {place}, {sport}, {weather}, {vibe}, {city} get substituted.
+// Pool is intentionally large so repeats don't happen within a reasonable window.
 export const POST_TEMPLATES = [
-  // food
+  // food — varied sentence structures
   "just had {food} and honestly it fixed everything that was wrong with my day",
   "reminder that {food} exists and it's perfect",
   "{food} for lunch again. no notes.",
-  "if you haven't tried {food} in {city} you're doing it wrong",
+  "if you haven't tried {food} around here you're doing it wrong",
   "craving {food} at an unreasonable hour",
   "found the best {food} at this tiny spot near {place}. not sharing the name",
-  "okay {food} was not it today. bad batch. happens.",
+  "okay the {food} was not it today. bad batch. happens to everyone.",
+  "the {food} here genuinely goes hard",
+  "got {food} and immediately felt better about everything",
+  "telling everyone i know about this {food} spot near {place}",
+  "{food} twice this week and not even a little sorry about it",
+  "my whole afternoon improved because of {food}. that's the post.",
+  "why does {food} taste better when someone else makes it. asking for me.",
+  "the {food} near {place} is genuinely underrated",
+  "i think about {food} more than i should",
+  "had {food} for dinner and honestly that's the review",
 
-  // place
+  // place — varied structures
   "spent the afternoon at {place} and remembered why i actually like living here",
   "{place} was packed today but still worth it",
-  "anyone else always end up at {place} when they have nothing to do",
+  "anyone else always end up at {place} when they have nothing going on",
   "the vibe at {place} lately has been immaculate",
-  "that walk through {place} really reset my brain",
-  "first time at {place} in months and it's still the same. comforting.",
+  "that walk through {place} really reset my whole brain",
+  "first time back at {place} in months and it's still the same. comforting.",
+  "{place} on a weekday hits different",
+  "somehow ended up at {place} again. this keeps happening.",
+  "ran into three people i know at {place}. this city is a village.",
+  "{place} in the {season} is genuinely one of the better things in life",
+  "never get tired of {place} honestly",
+  "the walk from {place} to literally anywhere is always an adventure",
+  "had a whole moment at {place} today. hard to explain.",
+  "if you haven't been to {place} recently you're missing out",
+  "{place} was giving today. that's all.",
+  "took a detour through {place} and it was worth every minute",
+  "the people at {place} are always exactly the people you'd expect",
 
-  // weather
-  "it is {weather} right now and that is simply the situation",
+  // weather — varied reactions
+  "it is {weather} right now and that is simply the situation we're in",
   "{weather} out here and people are still acting surprised. it's {city}.",
-  "woke up to {weather} and honestly expected it",
+  "woke up to {weather} and honestly could not be less shocked",
   "{weather} so naturally everyone forgot how to drive",
-  "the forecast said {weather} and delivered. respect.",
+  "the forecast said {weather} and fully delivered. respect.",
+  "it's {weather} and somehow the city is still going. as it should.",
+  "{weather} again. we adapt. we survive. we complain.",
+  "dressed for {weather} for the first time this year. feels right.",
+  "this {weather} is exactly what i needed today actually",
+  "the {weather} is doing a lot right now",
+  "{weather} but {place} still somehow has a line outside",
+  "only in {city} would {weather} feel completely normal",
+  "woke up to {weather} and decided that was fine",
+  "{weather} out here. sending strength to everyone.",
+  "the nerve of this city to be {weather} on a day i have plans",
 
-  // sports
-  "can't focus on anything else tonight with the {sport} game on",
-  "{sport} fans in {city} are built different",
-  "watching the {sport} game at a bar near {place}. classic {city} evening",
+  // sports — varied
+  "can't focus on anything right now with the {sport} game on",
+  "{sport} fans in {city} are genuinely built different",
+  "watching the {sport} game at a spot near {place}. classic {city} evening",
+  "the city has a completely different energy when the {sport}s are doing well",
+  "not saying anything about the {sport}s game but i'm saying something",
+  "{sport} game tonight and the whole neighborhood knows it",
+  "okay the {sport}s pulled through. faith restored. briefly.",
+  "every bar near {place} is packed for the {sport} game. great night to stay in.",
 
-  // casual / generic local
-  "being in {city} really does something to your sense of what's normal",
-  "love this city. also it's {weather}. both things are true.",
-  "running errands around {place} and realizing i've been here way too long to still call it new",
-  "the {city} attitude is contagious and i don't hate it",
-  "{vibe} and i'm here for it",
-  "one of those perfect {city} days. not a single complaint.",
-  "this city is a lot but it's home at this point",
-  "just a regular {city} {timeofday}. nothing to report. everything is fine.",
-  "saw something only possible in {city} today. wild.",
-  "can't explain what makes {city} different but something does",
-  "{city} people are either fully awake or completely checked out and there's no in between",
-  "running late as always but at least {city} looks good",
-  "the amount of personality packed into {place} is genuinely impressive",
-  "doing my best out here in {city}",
-  "had one of those unexpectedly good {city} days today",
-  "weather app said one thing, {city} said another",
-  "still finding new spots near {place} after all this time. good sign.",
-  "unpopular opinion: {city} in the {season} is the best time to be here",
-  "just had one of those only-in-{city} conversations",
+  // commute / errands / routines
+  "the commute through {place} this morning was a journey",
+  "running errands near {place} and somehow it took three hours",
+  "that specific kind of tired you get from doing normal {city} things all day",
+  "another day of doing things and being places in {city}",
+  "the errands near {place} somehow took twice as long as planned",
+  "got everything done and only slightly lost near {place}. win.",
+  "the morning routine in {city} hits a little different",
+
+  // strangers / city observations
+  "overheard the wildest conversation near {place} today",
+  "saw something at {place} that i can't explain but i respect it",
+  "the people near {place} are always doing something interesting",
+  "this city has a way of surprising you near {place} even after years",
   "the randomness of running into someone you know at {place}",
+  "only in {city} does this kind of thing happen and nobody blinks",
+  "had one of those only-in-{city} conversations today",
+  "the character of the people near {place} is unmatched",
+  "watched someone near {place} do something impressive and say nothing about it",
+
+  // mood / general city love
+  "one of those perfect {city} {timeofday}s. genuinely no complaints.",
+  "being in {city} does something to your sense of what's normal",
+  "love this city. also it's {weather}. both things are true simultaneously.",
+  "{vibe} and honestly i'm here for it",
+  "doing my best out here in {city} and it's going okay",
+  "had one of those unexpectedly good {city} days today",
+  "the {city} energy today was real",
+  "this city is a lot but it's home at this point and i wouldn't trade it",
+  "can't explain what makes {city} different but something definitely does",
+  "still finding new things to like about this place after all this time",
+  "unpopular opinion: {city} in the {season} is genuinely the move",
+  "{city} on a {timeofday} like this is hard to beat",
+  "the {season} in {city} is something else. in a good way.",
+  "took the long way home through {place} and did not regret it",
+  "the {city} skyline never gets old. that's the whole post.",
+  "just a regular {city} {timeofday} and it's kind of perfect",
+  "running a little late but {city} looks too good to rush",
+  "something about {place} in the {season} just makes sense",
+  "you either love {city} or you've never spent a real {season} here",
+  "the {timeofday} energy in {city} is always exactly what it is",
+  "some days {city} just does its thing and you go with it",
+  "{city} in the {timeofday} light hits different",
+  "checked in on {place} today. still itself. reassuring.",
+  "the amount of life happening near {place} at any given moment",
+  "had a completely normal {city} day and it was great",
+  "this city keeps delivering. no notes.",
+  "another good one in {city}. grateful honestly.",
+  "the {season} air near {place} is something i look forward to every year",
+  "feeling good about {city} today. it happens.",
+  "the texture of a {city} {timeofday} is hard to put into words but you know it",
+  "walked past {place} today for the hundredth time and it still feels right",
 ];
 
 // Time of day labels
@@ -250,11 +317,16 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function generateBotPost(cityKey: string): string {
+export function generateBotPost(cityKey: string, recentTemplates: Set<string> = new Set()): string {
   const city = BOT_CITIES[cityKey];
   if (!city) return "just a regular day out here";
 
-  const template = pick(POST_TEMPLATES);
+  // Shuffle candidates excluding recently used templates
+  const available = POST_TEMPLATES.filter((t) => !recentTemplates.has(t));
+  // Fall back to full pool if somehow all are exhausted
+  const pool = available.length >= 5 ? available : POST_TEMPLATES;
+
+  const template = pick(pool);
   return template
     .replace("{food}", pick(city.foods))
     .replace("{place}", pick(city.places))
@@ -264,4 +336,10 @@ export function generateBotPost(cityKey: string): string {
     .replace("{city}", city.city.toLowerCase())
     .replace("{timeofday}", getTimeOfDay())
     .replace("{season}", getSeason());
+}
+
+export function getTemplateKey(content: string): string {
+  // Extract the template "shape" by stripping city-specific words.
+  // We store the raw template instead — see botRunner usage.
+  return content;
 }
